@@ -1,6 +1,6 @@
 {
-  "name": "빅뱅영어학원 | AI맞춤형 영어전문학원",
-  "description": "초중고 맞춤형 영어 전문 빅뱅 영어학원 공식 홈페이지입니다. 1:1 진단 및 레벨테스트 예약.",
+  "name": "빅뱅영어학원 | 만수동 내신·수능 1등급 AI 맞춤형 영어전문",
+  "description": "동인천고·숭덕여고·문일여고·만수고 등 만수동 11개교 내신 1등급 밀착 관리. 1:1 정밀 진단 및 무료 레벨테스트 신청.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
