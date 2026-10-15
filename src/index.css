@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-pretendard: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+    --navy-primary: #122B49;
+    --navy-dark: #0A192F;
+    --caramel-gold: #C59750;
+    --caramel-hover: #B58540;
+    --blueprint-grid: rgba(185, 210, 238, 0.45);
+  }
+
+  html {
+    font-family: var(--font-pretendard);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    font-family: var(--font-pretendard);
+    word-break: keep-all;
+    overflow-wrap: break-word;
+    letter-spacing: -0.015em;
+    background-color: #f6f9fc;
+    color: #1e293b;
+  }
+
+  /* Ensure Korean words don't break awkwardly across lines inside cards & boxes */
+  p, h1, h2, h3, h4, h5, h6, span, div, li, button, a {
+    word-break: keep-all;
+  }
+}
+
+/* Blueprint Grid Pattern matching the reference image */
+.bg-blueprint-grid {
+  background-color: #f7f9fd;
+  background-image: 
+    linear-gradient(to right, rgba(188, 212, 240, 0.5) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(188, 212, 240, 0.5) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* Custom subtle scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
