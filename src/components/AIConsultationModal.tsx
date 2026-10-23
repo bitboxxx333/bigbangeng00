@@ -10,7 +10,8 @@ interface AIConsultationModalProps {
   onClose: () => void;
   messages: ChatMessage[];
   isLoading: boolean;
-  serviceUnavailable: boolean;
+  guidedMode: boolean;
+  reportReady: boolean;
   currentStage: ConsultationStage;
   selectedSchool?: SchoolData;
   selectedGrade?: string;
@@ -28,7 +29,8 @@ export const AIConsultationModal: React.FC<AIConsultationModalProps> = ({
   onClose,
   messages,
   isLoading,
-  serviceUnavailable,
+  guidedMode,
+  reportReady,
   currentStage,
   selectedSchool,
   selectedGrade,
@@ -63,7 +65,7 @@ export const AIConsultationModal: React.FC<AIConsultationModalProps> = ({
     setInputText('');
   };
 
-  const hasDiagnosticOutput = !serviceUnavailable && currentStage >= 3;
+  const hasDiagnosticOutput = !guidedMode && reportReady;
 
   return (
     <>
@@ -87,7 +89,7 @@ export const AIConsultationModal: React.FC<AIConsultationModalProps> = ({
                   )}
                 </div>
                 <p className="text-[11px] text-slate-300">
-                  만수동 6개교 기출 데이터베이스 기반 1:1 맞춤 학습진단
+                  학교·학년·고민 확인 후 준비 방향과 방문 상담을 안내합니다
                 </p>
               </div>
             </div>
@@ -114,8 +116,8 @@ export const AIConsultationModal: React.FC<AIConsultationModalProps> = ({
           {/* 4-Step Consultation Progress Bar & Actions */}
           <div className="bg-slate-50 border-b border-slate-200 px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-2 text-xs">
             <div className="flex items-center gap-1.5 font-bold text-slate-700">
-              <span className={`w-2 h-2 rounded-full ${serviceUnavailable ? 'bg-amber-500' : hasDiagnosticOutput ? 'bg-emerald-600' : 'bg-blue-500'}`} />
-              <span>{serviceUnavailable ? '자동 분석 연결 실패' : hasDiagnosticOutput ? '1:1 맞춤 진단 완료' : '상담 대기 중'}</span>
+              <span className={`w-2 h-2 rounded-full ${guidedMode ? 'bg-blue-500' : hasDiagnosticOutput ? 'bg-emerald-600' : 'bg-blue-500'}`} />
+              <span>{guidedMode ? '단계별 상담 안내 중 (자동 분석 미연결)' : hasDiagnosticOutput ? '1:1 맞춤 진단 완료' : '상담 진행 중'}</span>
             </div>
 
             <div className="flex items-center gap-2">
@@ -135,7 +137,7 @@ export const AIConsultationModal: React.FC<AIConsultationModalProps> = ({
                 className="text-xs font-bold text-[#122B49] bg-white hover:bg-slate-100 border border-slate-300 px-2.5 py-1.5 rounded-lg transition flex items-center gap-1 cursor-pointer"
               >
                 <CalendarCheck className="w-3.5 h-3.5 text-amber-700" />
-                <span className="hidden sm:inline">무료 레벨테스트 신청</span>
+                <span className="hidden sm:inline">방문 상담 문의</span>
                 <span className="sm:hidden">예약</span>
               </button>
             </div>
@@ -157,7 +159,7 @@ export const AIConsultationModal: React.FC<AIConsultationModalProps> = ({
             {isLoading && (
               <div className="flex items-center gap-2.5 text-xs text-slate-700 font-medium bg-white border border-slate-200 w-fit px-4 py-2.5 rounded-2xl shadow-xs">
                 <Sparkles className="w-4 h-4 text-blue-700 animate-spin shrink-0" />
-                <span>AI 상담실장이 만수동 기출 데이터를 분석하여 답변을 작성하고 있습니다...</span>
+                <span>상담 안내를 준비하고 있습니다...</span>
               </div>
             )}
 
