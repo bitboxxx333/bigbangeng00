@@ -44,17 +44,17 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
 
   const [studentName, setStudentName] = useState('');
   const [parentPhone, setParentPhone] = useState('');
-  const [selectedSchool, setSelectedSchool] = useState(defaultSchool?.name || '동인천고등학교');
-  const [selectedGrade, setSelectedGrade] = useState(defaultGrade || '고1');
+  const [selectedSchool, setSelectedSchool] = useState(defaultSchool?.name || '');
+  const [selectedGrade, setSelectedGrade] = useState(defaultGrade || '');
   const [selectedConcerns, setSelectedConcerns] = useState<string[]>(
     defaultConcerns.length > 0 ? defaultConcerns : [COMMON_CONCERNS[0].label]
   );
-  const [preferredDate, setPreferredDate] = useState(
-    new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0]
-  );
-  const [preferredTime, setPreferredTime] = useState('18:00');
+  const [preferredDate, setPreferredDate] = useState('');
+  const [preferredTime, setPreferredTime] = useState('');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const [apiAvailable, setApiAvailable] = useState(false);
   const [confirmedReservation, setConfirmedReservation] = useState<Reservation | null>(null);
   const [isCopied, setIsCopied] = useState(false);
   const [kakaoOpenChatUrl, setKakaoOpenChatUrl] = useState(ACADEMY_INFO.kakaoChannelUrl);
@@ -63,6 +63,14 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
   const [methodCSent, setMethodCSent] = useState(false);
 
   useEffect(() => {
+    fetch('/api/reservations')
+      .then(async (res) => {
+        if (!res.ok || !res.headers.get('content-type')?.includes('application/json')) return false;
+        const data = await res.json();
+        return typeof data.count === 'number';
+      })
+      .then(setApiAvailable)
+      .catch(() => setApiAvailable(false));
     fetch('/api/settings')
       .then((res) => res.json())
       .then((data) => {
@@ -74,9 +82,11 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
   }, []);
 
   useEffect(() => {
-    if (defaultGrade) setSelectedGrade(defaultGrade);
-    if (defaultSchool?.name) setSelectedSchool(defaultSchool.name);
-    if (defaultConcerns && defaultConcerns.length > 0) setSelectedConcerns(defaultConcerns);
+    if (!isOpen) return;
+    setSelectedGrade(defaultGrade || '');
+    setSelectedSchool(defaultSchool?.name || '');
+    setSelectedConcerns(defaultConcerns || []);
+    setSubmitError('');
   }, [defaultGrade, defaultSchool, defaultConcerns, isOpen]);
 
   const toggleConcern = (label: string) => {
@@ -111,11 +121,21 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!studentName.trim() || !parentPhone.trim()) {
-      alert('학생 성함과 학부모 연락처를 입력해주세요.');
+    if (!studentName.trim() || !parentPhone.trim() || !selectedSchool || !selectedGrade || !preferredDate || !preferredTime) {
+      setSubmitError('필수 항목을 모두 선택해 주세요.');
+      return;
+    }
+    const schoolType = TARGET_SCHOOLS.find((school) => school.name === selectedSchool)?.type;
+    if ((selectedGrade.includes('예비고1') || selectedGrade.startsWith('중')) && schoolType === 'high') {
+      setSubmitError('현재 학년과 재학 학교가 맞지 않습니다. 재학 학교를 다시 선택해 주세요.');
       return;
     }
 
+    if (!apiAvailable) {
+      setSubmitError('온라인 접수 서비스가 연결되지 않았습니다. 전화 또는 카카오톡으로 문의해 주세요.');
+      return;
+    }
+    setSubmitError('');
     setIsSubmitting(true);
     try {
       const response = await fetch('/api/reservations', {
@@ -133,48 +153,19 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
         }),
       });
 
-      const data = await response.json();
-      let resolvedRes: Reservation;
-      if (response.ok && data.reservation) {
-        resolvedRes = data.reservation;
-        if (data.kakaoOpenChatUrl) {
-          setKakaoOpenChatUrl(data.kakaoOpenChatUrl);
-        }
-      } else {
-        // Fallback local creation
-        resolvedRes = {
-          id: `BB-REV-${Date.now().toString().slice(-6)}`,
-          studentName: studentName.trim(),
-          parentPhone: parentPhone.trim(),
-          school: selectedSchool,
-          grade: selectedGrade,
-          concerns: selectedConcerns,
-          preferredDate,
-          preferredTime,
-          notes: notes.trim(),
-          createdAt: new Date().toISOString(),
-          status: '접수완료',
-        };
+      if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) {
+        throw new Error('Reservation API unavailable');
       }
-      setConfirmedReservation(resolvedRes);
-      onReservationComplete(resolvedRes);
+      const data = await response.json();
+      if (!data.reservation?.id) {
+        throw new Error('Reservation was not confirmed by the server');
+      }
+      if (data.kakaoOpenChatUrl) setKakaoOpenChatUrl(data.kakaoOpenChatUrl);
+      setConfirmedReservation(data.reservation);
+      onReservationComplete(data.reservation);
     } catch (err) {
-      console.error('Reservation submission failed, creating locally:', err);
-      const localRes: Reservation = {
-        id: `BB-REV-${Date.now().toString().slice(-6)}`,
-        studentName: studentName.trim(),
-        parentPhone: parentPhone.trim(),
-        school: selectedSchool,
-        grade: selectedGrade,
-        concerns: selectedConcerns,
-        preferredDate,
-        preferredTime,
-        notes: notes.trim(),
-        createdAt: new Date().toISOString(),
-        status: '접수완료',
-      };
-      setConfirmedReservation(localRes);
-      onReservationComplete(localRes);
+      console.error('Reservation submission failed:', err);
+      setSubmitError('온라인 접수가 확인되지 않았습니다. 예약은 완료되지 않았습니다. 아래 전화 또는 카카오톡으로 문의해 주세요.');
     } finally {
       setIsSubmitting(false);
     }
@@ -229,7 +220,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
                   무료 레벨테스트 예약이 성공적으로 접수되었습니다!
                 </h4>
                 <p className="text-xs text-emerald-800 mt-1">
-                  담당 상담실장이 접수 내역 확인 후 30분 이내로 확정 안내 문자를 보내드립니다.
+                  학원에서 접수 내역과 방문 희망일시를 확인한 뒤 연락드립니다.
                 </p>
               </div>
 
@@ -294,7 +285,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
                 {/* Director Smartphone Real-Time Notification Status Badge */}
                 <div className="mt-3 py-2.5 px-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-center gap-2 text-xs text-emerald-900 font-bold">
                   <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                  <span>학원 관리 시스템 및 원장님 실시간 알림 전송 완료</span>
+                  <span>서버 접수 확인됨 · 방문 일정은 학원 확인 후 확정</span>
                 </div>
               </div>
 
@@ -446,10 +437,12 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
                   <select
                     value={selectedSchool}
                     onChange={(e) => setSelectedSchool(e.target.value)}
+                    required
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:outline-hidden focus:ring-2 focus:ring-blue-600 bg-white"
                   >
+                    <option value="" disabled>재학 중인 학교를 선택해 주세요</option>
                     {TARGET_SCHOOLS.map((s) => (
-                      <option key={s.id} value={s.name}>
+                      <option key={s.id} value={s.name} disabled={selectedGrade.includes('예비고1') && s.type === 'high'}>
                         {s.name} ({s.type === 'high' ? '고등' : '중등'})
                       </option>
                     ))}
@@ -465,9 +458,11 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
                   </label>
                   <select
                     value={selectedGrade}
-                    onChange={(e) => setSelectedGrade(e.target.value)}
+                    onChange={(e) => { setSelectedGrade(e.target.value); setSelectedSchool(''); }}
+                    required
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:outline-hidden focus:ring-2 focus:ring-blue-600 bg-white font-bold text-[#122B49]"
                   >
+                    <option value="" disabled>현재 학년을 선택해 주세요</option>
                     {showPrep2027 && (
                       <option value="2027 예비고1 (현 중3)">🔥 2027 예비고1 (현 중3)</option>
                     )}
@@ -540,7 +535,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
                     type="date"
                     required
                     value={preferredDate}
-                    onChange={(e) => setPreferredDate(e.target.value)}
+                    onChange={(e) => { setPreferredDate(e.target.value); setPreferredTime(''); }}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:outline-hidden focus:ring-2 focus:ring-blue-600"
                   />
                 </div>
@@ -554,16 +549,31 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
                     <select
                       value={preferredTime}
                       onChange={(e) => setPreferredTime(e.target.value)}
+                      required
                       className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-xs focus:outline-hidden focus:ring-2 focus:ring-blue-600 bg-white"
                     >
+                      <option value="" disabled>희망 시간을 선택해 주세요</option>
+                      {preferredDate && [0, 6].includes(new Date(`${preferredDate}T12:00:00`).getDay()) && (
+                        <>
+                          <option value="10:00">오전 10:00</option>
+                          <option value="11:00">오전 11:00</option>
+                          <option value="12:00">오후 12:00</option>
+                          <option value="13:00">오후 01:00</option>
+                        </>
+                      )}
                       <option value="14:00">오후 02:00</option>
                       <option value="15:00">오후 03:00</option>
                       <option value="16:00">오후 04:00</option>
                       <option value="17:00">오후 05:00</option>
                       <option value="18:00">오후 06:00 (추천)</option>
-                      <option value="19:00">오후 07:00 (추천)</option>
-                      <option value="20:00">오후 08:00</option>
-                      <option value="주말협의">주말(토) 오전/오후 조율</option>
+                      {preferredDate && ![0, 6].includes(new Date(`${preferredDate}T12:00:00`).getDay()) && (
+                        <>
+                          <option value="19:00">오후 07:00</option>
+                          <option value="20:00">오후 08:00</option>
+                          <option value="21:00">오후 09:00</option>
+                          <option value="22:00">오후 10:00</option>
+                        </>
+                      )}
                     </select>
                   </div>
                 </div>
@@ -595,15 +605,22 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
                 </div>
               </div>
 
+              <p className="text-[11px] text-slate-600">입력하신 이름·연락처·학교·학년·희망일시는 상담 접수 및 회신에 사용됩니다. 방문 일정은 학원 확인 후 확정됩니다.</p>
+              {submitError && <div role="alert" className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-800 text-xs">
+                {submitError} <a className="underline font-bold" href="tel:032-471-7525">전화 문의</a> · <a className="underline font-bold" href={kakaoOpenChatUrl} target="_blank" rel="noopener noreferrer">카카오톡 문의</a>
+              </div>}
+              {!apiAvailable && <div role="status" className="p-3 rounded-lg bg-amber-50 border border-amber-300 text-amber-950 text-xs">
+                온라인 예약 접수는 현재 준비 중입니다. 입력하신 내용은 전송되지 않습니다. <a className="underline font-bold" href="tel:032-471-7525">전화 문의</a> · <a className="underline font-bold" href={kakaoOpenChatUrl} target="_blank" rel="noopener noreferrer">카카오톡 문의</a>
+              </div>}
               {/* Submit Button */}
               <div className="pt-2">
                 <button
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || !apiAvailable}
                   className="w-full py-3 bg-[#0F2A4A] hover:bg-[#183a63] disabled:opacity-60 text-white font-bold text-xs sm:text-sm rounded-xl transition shadow-md flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <CalendarCheck className="w-4 h-4 text-amber-300" />
-                  <span>{isSubmitting ? '접수 처리 중...' : '무료 레벨테스트 1:1 컨설팅 예약 신청'}</span>
+                  <span>{isSubmitting ? '접수 처리 중...' : apiAvailable ? '무료 레벨테스트 1:1 컨설팅 예약 신청' : '온라인 예약 준비 중'}</span>
                 </button>
               </div>
             </form>
