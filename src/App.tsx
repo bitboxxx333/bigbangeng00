@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { HeroSection } from './components/HeroSection';
 import { SchoolCardGrid } from './components/SchoolCardGrid';
@@ -24,6 +24,7 @@ export default function App() {
   const [selectedSchool, setSelectedSchool] = useState<SchoolData | undefined>(undefined);
   const [selectedGrade, setSelectedGrade] = useState<string>('');
   const [selectedConcerns, setSelectedConcerns] = useState<string[]>([]);
+  const chatRequestVersion = useRef(0);
 
   // View state: 'main' (Student/Parent landing page) vs 'admin' (Director management dashboard)
   const [currentView, setCurrentView] = useState<'main' | 'admin'>('main');
@@ -104,13 +105,26 @@ export default function App() {
   // Main Chat Send Message Function
   const handleSendMessage = async (textToSend: string, overrideSchool?: SchoolData) => {
     const messageContent = textToSend.trim();
-    if (!messageContent || isLoading) return;
+    if (!messageContent) return;
+
+    // Detect the school on every message. A previous selection must not override a new one.
+    const schoolInMessage = TARGET_SCHOOLS.find((school) =>
+      messageContent.includes(school.badge) || messageContent.includes(school.name)
+    );
+    const otherSchoolInMessage = !schoolInMessage &&
+      ['초등', '기타', '초등학교', '인근'].some((keyword) => messageContent.includes(keyword));
+    const detectedSchool = overrideSchool || schoolInMessage ||
+      (otherSchoolInMessage ? OTHER_SCHOOL_INFO : selectedSchool);
+    const changingSchool = Boolean(selectedSchool && detectedSchool && selectedSchool.name !== detectedSchool.name);
+
+    // Allow a school change even while a previous reply is pending, and discard that stale reply.
+    if (isLoading && !changingSchool) return;
+    const requestVersion = ++chatRequestVersion.current;
 
     const userTimestamp = new Date().toLocaleTimeString('ko-KR', {
       hour: '2-digit',
       minute: '2-digit',
     });
-
     const userMessage: ChatMessage = {
       id: `usr-${Date.now()}`,
       sender: 'user',
@@ -118,27 +132,19 @@ export default function App() {
       timestamp: userTimestamp,
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    setMessages((prev) => changingSchool ? [userMessage] : [...prev, userMessage]);
     setIsLoading(true);
-
-    // Detect school from message if not already set
-    let detectedSchool = overrideSchool || selectedSchool;
-    if (!detectedSchool) {
-      for (const s of TARGET_SCHOOLS) {
-        if (messageContent.includes(s.badge) || messageContent.includes(s.name)) {
-          detectedSchool = s;
-          setSelectedSchool(s);
-          break;
-        }
-      }
-      if (!detectedSchool && (messageContent.includes('초등') || messageContent.includes('기타') || messageContent.includes('초등학교') || messageContent.includes('인근'))) {
-        detectedSchool = OTHER_SCHOOL_INFO;
-        setSelectedSchool(OTHER_SCHOOL_INFO);
-      }
+    if (detectedSchool && detectedSchool.name !== selectedSchool?.name) {
+      setSelectedSchool(detectedSchool);
+    }
+    if (changingSchool) {
+      setCurrentStage(1);
+      setSelectedGrade('');
+      setSelectedConcerns([]);
     }
 
-    // Detect grade from message if not set
-    let detectedGrade = selectedGrade;
+    // A new school also starts a new grade and conversation context.
+    let detectedGrade = changingSchool ? '' : selectedGrade;
     if (!detectedGrade) {
       if (messageContent.includes('고1') || messageContent.includes('고등학교 1')) detectedGrade = '고1';
       else if (messageContent.includes('고2') || messageContent.includes('고등학교 2')) detectedGrade = '고2';
@@ -147,6 +153,12 @@ export default function App() {
       else if (messageContent.includes('중2') || messageContent.includes('중학교 2')) detectedGrade = '중2';
       else if (messageContent.includes('중3') || messageContent.includes('중학교 3')) detectedGrade = '중3';
       else if (messageContent.includes('초등')) detectedGrade = '초등';
+      else {
+        const yearMatch = messageContent.match(/([1-3])학년/);
+        if (yearMatch && detectedSchool && detectedSchool !== OTHER_SCHOOL_INFO) {
+          detectedGrade = `${detectedSchool.badge.includes('중') ? '중' : '고'}${yearMatch[1]}`;
+        }
+      }
       if (detectedGrade) setSelectedGrade(detectedGrade);
     }
 
@@ -156,21 +168,22 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: messageContent,
-          messagesHistory: messages,
+          messagesHistory: changingSchool ? [] : messages,
           school: detectedSchool?.name,
           grade: detectedGrade,
-          concern: selectedConcerns.join(', '),
-          stage: currentStage,
+          concern: changingSchool ? '' : selectedConcerns.join(', '),
+          stage: changingSchool ? 1 : currentStage,
         }),
       });
 
       const data = await response.json();
+      if (requestVersion !== chatRequestVersion.current) return;
       const aiTimestamp = new Date().toLocaleTimeString('ko-KR', {
         hour: '2-digit',
         minute: '2-digit',
       });
 
-      const nextStage = (data.stage || currentStage) as ConsultationStage;
+      const nextStage = (data.stage || (changingSchool ? 1 : currentStage)) as ConsultationStage;
       setCurrentStage(nextStage);
 
       const aiMessage: ChatMessage = {
@@ -186,6 +199,7 @@ export default function App() {
 
       setMessages((prev) => [...prev, aiMessage]);
     } catch (error) {
+      if (requestVersion !== chatRequestVersion.current) return;
       console.error('Chat error:', error);
       const fallbackAi: ChatMessage = {
         id: `ai-err-${Date.now()}`,
@@ -199,12 +213,14 @@ export default function App() {
       setMessages((prev) => [...prev, fallbackAi]);
       setCurrentStage(4);
     } finally {
-      setIsLoading(false);
+      if (requestVersion === chatRequestVersion.current) setIsLoading(false);
     }
   };
 
   // Reset Consultation
   const handleResetConsultation = () => {
+    chatRequestVersion.current++;
+    setIsLoading(false);
     setCurrentStage(1);
     setSelectedSchool(undefined);
     setSelectedGrade('');
@@ -293,7 +309,6 @@ export default function App() {
 
   // When a user clicks a 2x2 chip tag in school card
   const handleSchoolTagClick = (school: SchoolData, tag: string) => {
-    setSelectedSchool(school);
     setIsAIChatModalOpen(true);
     handleSendMessage(`${school.name} ${tag} 내용과 맞춤 대비 전략을 알려주세요.`, school);
   };
@@ -512,7 +527,6 @@ export default function App() {
         selectedConcerns={selectedConcerns}
         onSendMessage={(text) => handleSendMessage(text)}
         onSelectSchool={(school) => {
-          setSelectedSchool(school);
           handleSendMessage(`${school.name} 학생입니다. 우리 학교 내신 출제 경향과 맞춤 대비 솔루션이 궁금해요.`, school);
         }}
         onSelectConcern={(concern) => {
@@ -531,7 +545,6 @@ export default function App() {
           setDetailSchool(null);
         }}
         onStartConsultation={(school) => {
-          setSelectedSchool(school);
           setIsAIChatModalOpen(true);
           handleSendMessage(`${school.name}의 킬러 문항과 서술형 대비 전략에 대해 자세히 상담받고 싶어요.`, school);
         }}
