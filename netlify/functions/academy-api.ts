@@ -60,7 +60,7 @@ export default async (request: Request) => {
       const preferredTime = clean(body.preferredTime, 40);
       const notes = clean(body.notes, 1000);
       const concerns = Array.isArray(body.concerns) ? body.concerns.slice(0, 12).map((v: unknown) => clean(v, 120)).filter(Boolean) : [];
-      if (!studentName || !/^0[0-9 -]{7,18}$/.test(parentPhone) || !school || !grade || !preferredDate || !preferredTime || !concerns.length) {
+      if (!studentName || !/^0[0-9 -]{7,18}$/.test(parentPhone) || !school || !grade || !preferredDate || !preferredTime) {
         return json({ error: '필수 항목과 연락처를 확인해 주세요.' }, 400);
       }
       if (preferredDate !== '일정 협의' && !/^\d{4}-\d{2}-\d{2}$/.test(preferredDate)) return json({ error: '희망 날짜를 확인해 주세요.' }, 400);
