@@ -26,14 +26,14 @@ function buildGuidedReply(message: string, school: SchoolData | undefined, grade
       text: (message.includes('예비고1') || message.includes('2027')
         ? '2027 예비고1 진단은 현재 중3 학생을 위한 안내입니다. '
         : '') + '먼저 학생의 재학 학교를 알려주세요. 학교와 학년을 확인한 뒤 고민과 방문 상담 순서로 안내하겠습니다.',
-      suggestedReplies: ['동인천고 1학년입니다', '숭덕여고 2학년이에요', '정각중 2학년입니다'],
+      suggestedReplies: /예비고1|2027/.test(message) ? ['만수북중 3학년입니다', '만수중 3학년입니다', '간석여중 3학년입니다', '정각중 3학년입니다'] : ['동인천고 1학년입니다', '숭덕여고 2학년이에요', '정각중 2학년입니다'],
     };
   }
   if (!grade) {
     return {
       stage: 1,
       text: school.badge + ' 학생이시군요. 현재 학년을 알려주시면 다음으로 가장 고민되는 영어 영역을 여쭙겠습니다.',
-      suggestedReplies: school.type === 'middle' ? ['중1입니다', '중2입니다', '중3입니다'] : ['고1입니다', '고2입니다', '고3입니다'],
+      suggestedReplies: school.type === 'middle' ? ['중1입니다', '중2입니다', '중3입니다'] : school.type === 'high' ? ['고1입니다', '고2입니다', '고3입니다'] : ['초등 고학년', '중1입니다', '중2입니다', '중3입니다', '고1입니다'],
     };
   }
   if (!concern && stage <= 2) {
@@ -46,7 +46,7 @@ function buildGuidedReply(message: string, school: SchoolData | undefined, grade
   if (stage >= 3 && /예약|방문|일정|신청|시간|전화|카카오|위치/.test(message)) {
     return {
       stage: 4,
-      text: '무료 레벨테스트와 방문 상담을 원하시는군요. 날짜와 시간을 함께 조율하겠습니다. 다만 현재 온라인 예약 접수 서버는 연결되지 않아 이 대화만으로 예약이 확정되지 않습니다. 예약 양식의 전화 또는 카카오톡 문의로 학원에 직접 연락해 주세요. 상담 전화: 032-471-7525.',
+      text: '무료 레벨테스트와 방문 상담을 원하시는군요. 현재 온라인 예약 접수 서버는 연결되지 않아 이 대화만으로 예약이 확정되지 않습니다. 예약 양식의 전화 또는 카카오톡 문의로 학원에 희망 날짜와 시간을 직접 알려주시고 일정을 조율해 주세요. 상담 전화: 032-471-7525.',
       suggestedReplies: ['학원 위치 및 전화 문의', '학교별 준비 방향 다시 알려주세요'],
     };
   }
@@ -62,7 +62,7 @@ function buildGuidedReply(message: string, school: SchoolData | undefined, grade
     : '최근 시험지와 학습 자료를 대조해 어려웠던 유형을 먼저 확인하는 것이 좋습니다.';
   return {
     stage: 3,
-    text: school.badge + ' ' + grade + ' 학생의 고민을 ' + concern + '(으)로 이해했습니다. 학원에 게시된 학교별 대비 초점은 "' + focus + '"입니다.\n\n' + advice + '\n\n이 내용은 단계별 상담 안내이며, 실제 시험지 분석이나 개인 진단이 완료된 것은 아닙니다. 무료 레벨테스트와 방문 상담을 원하시면 알려주세요.',
+    text: school.badge + ' ' + grade + ' 학생의 고민을 이렇게 이해했습니다: ' + concern + '. 학원에 게시된 학교별 대비 초점은 "' + focus + '"입니다.\n\n' + advice + '\n\n이 내용은 단계별 상담 안내이며, 실제 시험지 분석이나 개인 진단이 완료된 것은 아닙니다. 무료 레벨테스트와 방문 상담을 원하시면 알려주세요.',
     suggestedReplies: ['무료 레벨테스트 방문 상담 방법', '학원 위치 및 전화 문의'],
   };
 }
@@ -188,6 +188,7 @@ export default function App() {
     else if (detectedSchool?.name !== selectedSchool?.name) setSelectedSchool(detectedSchool);
 
     let detectedGrade = isPrepInquiry ? '2027 예비고1 (현 중3)' : changingSchool ? '' : selectedGrade;
+    if (detectedGrade.startsWith('2027') && schoolInMessage && /[1-3]학년|중[1-3]|고[1-3]/.test(messageContent)) detectedGrade = '';
     if (!detectedGrade) {
       if (/고1|고등학교 1/.test(messageContent)) detectedGrade = '고1';
       else if (/고2|고등학교 2/.test(messageContent)) detectedGrade = '고2';
@@ -205,8 +206,10 @@ export default function App() {
     }
     if (detectedGrade !== selectedGrade) setSelectedGrade(detectedGrade);
     const effectiveStage = changingSchool ? 1 : currentStage;
-    const concernFromMessage = effectiveStage >= 2 && /서술형|영작|문법|어휘|단어|독해|모의고사|부교재|시험 시간/.test(messageContent)
-      ? messageContent.replace(/^가장 큰 영어 고민은 ['"]?|['"]? 입니다\.?$/g, '').slice(0, 90) : '';
+    const concernFromMessage = effectiveStage === 2 && !/학교|학년|기출|분석|알려|궁금|예약|방문/.test(messageContent)
+      ? messageContent.replace(/^가장 큰 영어 고민은 ['"]?|['"]? 입니다\.?$/g, '').slice(0, 90)
+      : effectiveStage >= 2 && /서술형|영작|문법|어휘|단어|독해|모의고사|부교재|시험 시간/.test(messageContent)
+      ? messageContent.slice(0, 90) : '';
     const concern = changingSchool || isPrepInquiry ? '' : concernFromMessage || selectedConcerns[0] || '';
     if (concernFromMessage && !changingSchool) setSelectedConcerns((prev) => prev.includes(concernFromMessage) ? prev : [concernFromMessage]);
 
