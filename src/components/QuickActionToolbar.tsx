@@ -32,8 +32,8 @@ export const QuickActionToolbar: React.FC<QuickActionToolbarProps> = ({
               : currentStage === 2
               ? '2단계: 가장 답답한 영어 고민을 선택해 주세요'
               : currentStage === 3
-              ? '3단계: 학교별 맞춤 기출 솔루션 및 레벨테스트 안내'
-              : '4단계: 무료 레벨테스트 및 1:1 컨설팅 예약 신청'}
+              ? '3단계: 학교별 준비 방향 및 레벨테스트 안내'
+              : '4단계: 방문 상담 문의 및 일정 조율'}
           </span>
         </div>
 
@@ -52,7 +52,7 @@ export const QuickActionToolbar: React.FC<QuickActionToolbarProps> = ({
             className="text-[11px] text-orange-900 hover:text-orange-950 font-bold bg-amber-100/80 hover:bg-amber-200/80 border border-amber-300/80 px-2.5 py-1 rounded-lg transition cursor-pointer flex items-center gap-1 shadow-2xs"
           >
             <CalendarCheck className="w-3.5 h-3.5 text-orange-600 shrink-0" />
-            <span>바로예약</span>
+            <span>상담 문의</span>
           </button>
         </div>
       </div>
@@ -108,7 +108,7 @@ export const QuickActionToolbar: React.FC<QuickActionToolbarProps> = ({
               className="flex-1 py-3 px-4 bg-[#0F2A4A] hover:bg-[#183a63] text-white font-bold text-xs sm:text-sm rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer break-keep-all text-center leading-snug"
             >
               <CalendarCheck className="w-4 h-4 text-amber-300 shrink-0" />
-              <span>[무료] 1:1 정밀 레벨테스트 예약 양식 열기</span>
+              <span>무료 레벨테스트 방문 상담 문의하기</span>
             </button>
 
             {onOpenDiagnosticReport && (
