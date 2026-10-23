@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import { timingSafeEqual } from "node:crypto";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
@@ -28,47 +29,7 @@ interface ReservationRecord {
   kakaoNotifyMessage?: string;
 }
 
-const reservations: ReservationRecord[] = [
-  {
-    id: 'BB-REV-2026-001',
-    studentName: '김민준',
-    parentPhone: '010-3456-7890',
-    school: '동인천고등학교',
-    grade: '고1',
-    concerns: ['모의고사/부교재 변형 대비', '내신 서술형 영작 감점'],
-    preferredDate: '2026-09-22',
-    preferredTime: '17:30',
-    notes: '중학교 때는 90점대였는데 고등학교 첫 시험 후 충격 받음. 모의고사 변형 대비 희망',
-    createdAt: new Date(Date.now() - 3600000 * 2).toISOString(),
-    status: '확정'
-  },
-  {
-    id: 'BB-REV-2026-002',
-    studentName: '이서연',
-    parentPhone: '010-8765-4321',
-    school: '숭덕여고',
-    grade: '고2',
-    concerns: ['내신 서술형 영작 감점', '어휘력 부족 & 암기 취약'],
-    preferredDate: '2026-09-23',
-    preferredTime: '19:00',
-    notes: '숭덕여고 서술형 조건 영작 감점이 심함. 부교재 단어 정밀 피드백 요청',
-    createdAt: new Date(Date.now() - 3600000 * 5).toISOString(),
-    status: '접수완료'
-  },
-  {
-    id: 'BB-REV-2026-003',
-    studentName: '박지훈',
-    parentPhone: '010-2345-6789',
-    school: '만수북중학교',
-    grade: '중2',
-    concerns: ['문법 기초 개념 부족', '내신 서술형 영작 감점'],
-    preferredDate: '2026-09-24',
-    preferredTime: '16:00',
-    notes: '관계대명사와 to부정사 영작 서술형 감점이 많아 무료 레벨테스트 및 진단 희망',
-    createdAt: new Date(Date.now() - 3600000 * 12).toISOString(),
-    status: '접수완료'
-  }
-];
+const reservations: ReservationRecord[] = [];
 
 // Lazy Gemini client helper
 let aiClient: GoogleGenAI | null = null;
@@ -533,32 +494,16 @@ ${conversationContext || '첫 대화 시작'}
   }
 });
 
-// Admin PIN validation for protecting private student reservation data (default 7525, matches phone number 032-471-7525)
-const ADMIN_PIN = process.env.ADMIN_PIN || '7525';
+// Admin access is disabled until a private, strong ADMIN_PIN is configured on the server.
+const ADMIN_PIN = process.env.ADMIN_PIN?.trim();
 
 export function isValidAdminPin(inputPin: any): boolean {
-  if (!inputPin) return false;
-  const str = String(inputPin).trim();
-  const digits = str.replace(/[^0-9]/g, '');
-  const envPin = (process.env.ADMIN_PIN || '7525').trim();
-  const validPins = [
-    '7525',
-    '2006',
-    '0324717525',
-    '4717525',
-    '01020067525',
-    '20067525',
-    envPin,
-    envPin.replace(/[^0-9]/g, ''),
-  ].filter(Boolean);
-
-  if (validPins.includes(str) || validPins.includes(digits)) {
-    return true;
-  }
-  if (digits.endsWith('7525') || digits.endsWith('2006')) {
-    return true;
-  }
-  return false;
+  if (!ADMIN_PIN || ADMIN_PIN.length < 12 || typeof inputPin !== 'string') return false;
+  const candidate = inputPin.trim();
+  const supplied = Buffer.from(candidate);
+  const expected = Buffer.from(ADMIN_PIN);
+  if (supplied.length !== expected.length) return false;
+  return timingSafeEqual(supplied, expected);
 }
 
 // Mutable Academy notification & Open Chat settings
@@ -789,7 +734,7 @@ app.post("/api/admin/verify", (req, res) => {
     } else {
       return res.status(401).json({
         success: false,
-        error: "관리자 인증 번호(PIN)가 일치하지 않습니다. (기본 PIN: 7525)",
+        error: "관리자 인증 정보가 올바르지 않습니다.",
       });
     }
   } catch (error: any) {
@@ -858,7 +803,7 @@ app.post("/api/reservations", async (req, res) => {
       concerns: concernsArr,
       notes,
     });
-    const kakaoNotified = true;
+    const kakaoNotified = notifySent;
 
     const newReservation: ReservationRecord = {
       id: reservationId,
