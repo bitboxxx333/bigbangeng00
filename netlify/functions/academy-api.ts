@@ -20,7 +20,9 @@ const sameOrigin = (request: Request) => {
 export default async (request: Request) => {
   try {
     const url = new URL(request.url);
-    const route = url.searchParams.get('route');
+    const parts = url.pathname.split('/').filter(Boolean);
+    const publicPath = parts[0] === 'api' ? parts.slice(1).join('/') : '';
+    const route = url.searchParams.get('route') || (publicPath === 'reservations' ? 'reservations' : publicPath === 'admin/verify' ? 'verify' : publicPath === 'admin/settings' ? 'admin-settings' : publicPath === 'admin/test-notify' ? 'test-notify' : publicPath === 'settings' ? 'settings' : /^reservations\/[^/]+\/status$/.test(publicPath) ? 'status' : /^reservations\/[^/]+\/test$/.test(publicPath) ? 'delete-test' : '');
     if (!route) return json({ error: 'Not found' }, 404);
     if (!sameOrigin(request)) return json({ error: '허용되지 않은 요청입니다.' }, 403);
     if (route === 'settings' && request.method === 'GET') return json({});
@@ -73,7 +75,7 @@ export default async (request: Request) => {
     }
     if (route === 'status' && request.method === 'PATCH') {
       if (!validAdmin(request)) return json({ error: '관리자 인증이 필요합니다.' }, 401);
-      const id = url.searchParams.get('id') || '';
+      const id = url.searchParams.get('id') || parts[2] || '';
       if (!/^[0-9a-f-]{36}$/.test(id)) return json({ error: '잘못된 접수번호입니다.' }, 400);
       const body = await request.json();
       if (!['접수완료', '상담대기', '확정'].includes(body?.status)) return json({ error: '잘못된 상태입니다.' }, 400);
@@ -87,7 +89,7 @@ export default async (request: Request) => {
     }
     if (route === 'delete-test' && request.method === 'DELETE') {
       if (!validAdmin(request)) return json({ error: '관리자 인증이 필요합니다.' }, 401);
-      const id = url.searchParams.get('id') || '';
+      const id = url.searchParams.get('id') || parts[2] || '';
       if (!/^[0-9a-f-]{36}$/.test(id)) return json({ error: '잘못된 접수번호입니다.' }, 400);
       const records = store();
       const record = await records.get(id, { type: 'json' });
