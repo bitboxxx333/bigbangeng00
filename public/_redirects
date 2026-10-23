@@ -1,1 +1,8 @@
-/*    /index.html   200
+/api/reservations/:id/status /.netlify/functions/academy-api?route=status&id=:id 200!
+/api/reservations/:id/test /.netlify/functions/academy-api?route=delete-test&id=:id 200!
+/api/reservations /.netlify/functions/academy-api?route=reservations 200!
+/api/admin/verify /.netlify/functions/academy-api?route=verify 200!
+/api/admin/settings /.netlify/functions/academy-api?route=admin-settings 200!
+/api/admin/test-notify /.netlify/functions/academy-api?route=test-notify 200!
+/api/settings /.netlify/functions/academy-api?route=settings 200!
+/* /index.html 200

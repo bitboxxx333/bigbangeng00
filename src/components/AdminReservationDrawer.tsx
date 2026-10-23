@@ -79,7 +79,7 @@ export const AdminReservationDrawer: React.FC<AdminReservationDrawerProps> = ({
 
   useEffect(() => {
     if (isAdminAuthenticated) {
-      const pinToUse = activePin || '7525';
+      const pinToUse = activePin;
       fetch('/api/admin/settings', {
         headers: { 'x-admin-pin': pinToUse },
       })
@@ -101,18 +101,6 @@ export const AdminReservationDrawer: React.FC<AdminReservationDrawerProps> = ({
 
   if (!isOpen) return null;
 
-  const isPinLocallyValid = (input: string) => {
-    const trimmed = input.trim();
-    const digits = trimmed.replace(/[^0-9]/g, '');
-    return (
-      digits === '7525' ||
-      digits === '2006' ||
-      digits.endsWith('7525') ||
-      digits.endsWith('2006') ||
-      trimmed === '7525'
-    );
-  };
-
   const handleVerifyPin = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedPin = pinInput.trim();
@@ -133,12 +121,12 @@ export const AdminReservationDrawer: React.FC<AdminReservationDrawerProps> = ({
 
       if (res.ok) {
         const data = await res.json();
-        if (data.success) {
+        if (data.success && Array.isArray(data.reservations)) {
           setActivePin(trimmedPin);
           sessionStorage.setItem('bigbang_admin_pin', trimmedPin);
           sessionStorage.setItem('bb_admin_pin', trimmedPin);
           sessionStorage.setItem('bigbang_admin_auth', 'true');
-          onLoginSuccess(data.reservations || [], trimmedPin);
+          onLoginSuccess(data.reservations, trimmedPin);
           if (data.settings?.kakaoOpenChatUrl) {
             setOpenChatUrl(data.settings.kakaoOpenChatUrl);
           }
@@ -147,42 +135,9 @@ export const AdminReservationDrawer: React.FC<AdminReservationDrawerProps> = ({
         }
       }
 
-      // Fallback: If server returns non-200 or unexpected response, but PIN is valid (7525 / 2006)
-      if (isPinLocallyValid(trimmedPin)) {
-        setActivePin(trimmedPin);
-        sessionStorage.setItem('bigbang_admin_pin', trimmedPin);
-        sessionStorage.setItem('bb_admin_pin', trimmedPin);
-        sessionStorage.setItem('bigbang_admin_auth', 'true');
-        try {
-          const fetchRes = await fetch('/api/reservations', {
-            headers: { 'x-admin-pin': trimmedPin },
-          });
-          const fetchedData = await fetchRes.json();
-          if (fetchedData && Array.isArray(fetchedData.reservations)) {
-            onLoginSuccess(fetchedData.reservations, trimmedPin);
-            setPinInput('');
-            return;
-          }
-        } catch {
-          // ignore
-        }
-        onLoginSuccess([], trimmedPin);
-        setPinInput('');
-        return;
-      }
-
-      setErrorMessage('비밀번호가 올바르지 않습니다.');
-    } catch (err) {
-      if (isPinLocallyValid(trimmedPin)) {
-        setActivePin(trimmedPin);
-        sessionStorage.setItem('bigbang_admin_pin', trimmedPin);
-        sessionStorage.setItem('bb_admin_pin', trimmedPin);
-        sessionStorage.setItem('bigbang_admin_auth', 'true');
-        onLoginSuccess([], trimmedPin);
-        setPinInput('');
-      } else {
-        setErrorMessage('비밀번호가 올바르지 않습니다.');
-      }
+      setErrorMessage('관리자 인증에 실패했습니다. 비밀번호를 확인해 주세요.');
+    } catch {
+      setErrorMessage('관리자 서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.');
     } finally {
       setIsVerifying(false);
     }
@@ -194,7 +149,7 @@ export const AdminReservationDrawer: React.FC<AdminReservationDrawerProps> = ({
     setSettingsSaveMsg('');
 
     try {
-      const pinToUse = activePin || '7525';
+      const pinToUse = activePin;
       const res = await fetch('/api/admin/settings', {
         method: 'PATCH',
         headers: {
@@ -230,7 +185,7 @@ export const AdminReservationDrawer: React.FC<AdminReservationDrawerProps> = ({
     setIsSendingTest(true);
     setTestNotificationFeedback('');
     try {
-      const pinToUse = activePin || '7525';
+      const pinToUse = activePin;
       const res = await fetch('/api/admin/test-notify', {
         method: 'POST',
         headers: {
@@ -267,7 +222,7 @@ export const AdminReservationDrawer: React.FC<AdminReservationDrawerProps> = ({
     setTimeout(() => setCampaignSyncMsg(''), 4000);
 
     try {
-      const pinToUse = activePin || '7525';
+      const pinToUse = activePin;
       await fetch('/api/admin/settings', {
         method: 'PATCH',
         headers: {
@@ -532,16 +487,16 @@ export const AdminReservationDrawer: React.FC<AdminReservationDrawerProps> = ({
                       </div>
                       <div>
                         <h4 className="font-black text-sm text-[#122B49]">
-                          원장님 스마트폰 실시간 자동 알림 설정
+                          자동 알림 미연결 안내
                         </h4>
                         <p className="text-[11px] text-slate-600">
-                          학부모가 붙여넣기 할 필요 없이, 신청 즉시 원장님 스마트폰으로 0.1초 만에 자동 알림이 전송됩니다.
+                          상담 신청은 비공개 접수 대장에 저장됩니다. 자동 알림은 아직 발송되지 않습니다.
                         </p>
                       </div>
                     </div>
                     <span className="bg-emerald-600 text-white font-extrabold text-[10px] px-2.5 py-1 rounded-full flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                      자동 알림 활성
+                      자동 알림 미설정
                     </span>
                   </div>
                 </div>
@@ -802,7 +757,7 @@ export const AdminReservationDrawer: React.FC<AdminReservationDrawerProps> = ({
                   </div>
                   <ol className="list-decimal list-inside space-y-1 text-[11px] text-slate-700 font-medium pl-1 leading-relaxed">
                     <li>학부모가 웹사이트에서 이름과 연락처를 남기고 <strong>[상담 예약 완료]</strong>를 누릅니다.</li>
-                    <li>학부모가 붙여넣기를 하거나 카톡 창을 띄울 필요 없이, 서버에서 <strong>원장님 스마트폰으로 0.1초 만에 알림이 자동 전송</strong>됩니다.</li>
+                    <li>자동 알림은 아직 연결되지 않았습니다. 새 접수는 관리자 화면에서 확인해 주세요.</li>
                     <li>원장님 휴대폰에 학생 이름, 학교, 학년, 연락처, 고민 내역이 즉시 푸시 알림으로 표시됩니다.</li>
                     <li>알림을 확인하신 뒤 학부모님께 편하신 시간에 확인 전화를 드리면 상담 접수가 신속하게 완료됩니다!</li>
                   </ol>

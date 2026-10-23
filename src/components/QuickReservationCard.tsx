@@ -196,7 +196,7 @@ export const QuickReservationCard: React.FC<QuickReservationCardProps> = ({
             </div>
             <div>
               <h4 className="text-base font-black text-emerald-950">
-                상담 예약이 정상 접수되었습니다!
+                상담 신청이 서버에 저장되었습니다.
               </h4>
               <p className="text-xs text-emerald-800 mt-1 leading-relaxed break-keep-all">
                 빅뱅영어학원 상담실장이 <strong>{submittedData.parentPhone}</strong> 번호로 일정 확인 및 시험지 지참 안내 연락을 드립니다.
@@ -207,7 +207,7 @@ export const QuickReservationCard: React.FC<QuickReservationCardProps> = ({
               <div className="flex items-center justify-between">
                 <span>• 접수번호: <strong>{submittedData.id}</strong></span>
                 <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
-                  접수 기록 확인
+                  방문 일정 미확정 · 문자 미발송
                 </span>
               </div>
               <div>• 학생: {submittedData.studentName} ({submittedData.school} {submittedData.grade})</div>
@@ -251,14 +251,6 @@ export const QuickReservationCard: React.FC<QuickReservationCardProps> = ({
               )}
 
               <div className="grid grid-cols-2 gap-1.5">
-                <a
-                  href={getDirectSmsUrl(submittedData, directorMobile)}
-                  className="py-2.5 px-2 bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-900 font-extrabold text-[11px] rounded-lg transition flex items-center justify-center gap-1 shadow-2xs"
-                  title="010-2006-7525 원장님 직통 (내용 자동 입력)"
-                >
-                  <Smartphone className="w-3.5 h-3.5 text-blue-700" />
-                  <span>문자 전송 (자동완성)</span>
-                </a>
                 <a
                   href="tel:032-471-7525"
                   className="py-2 px-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 font-bold text-[11px] rounded-lg transition flex items-center justify-center gap-1 shadow-2xs"
