@@ -10,6 +10,7 @@ interface AIConsultationModalProps {
   onClose: () => void;
   messages: ChatMessage[];
   isLoading: boolean;
+  serviceUnavailable: boolean;
   currentStage: ConsultationStage;
   selectedSchool?: SchoolData;
   selectedGrade?: string;
@@ -27,6 +28,7 @@ export const AIConsultationModal: React.FC<AIConsultationModalProps> = ({
   onClose,
   messages,
   isLoading,
+  serviceUnavailable,
   currentStage,
   selectedSchool,
   selectedGrade,
@@ -61,7 +63,7 @@ export const AIConsultationModal: React.FC<AIConsultationModalProps> = ({
     setInputText('');
   };
 
-  const hasDiagnosticOutput = currentStage >= 3 || messages.some((m) => m.sender === 'ai' && m.id !== 'msg-init');
+  const hasDiagnosticOutput = !serviceUnavailable && currentStage >= 3;
 
   return (
     <>
@@ -112,20 +114,20 @@ export const AIConsultationModal: React.FC<AIConsultationModalProps> = ({
           {/* 4-Step Consultation Progress Bar & Actions */}
           <div className="bg-slate-50 border-b border-slate-200 px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-2 text-xs">
             <div className="flex items-center gap-1.5 font-bold text-slate-700">
-              <span className={`w-2 h-2 rounded-full ${hasDiagnosticOutput ? 'bg-emerald-600' : 'bg-emerald-500 animate-ping'}`} />
-              <span>{hasDiagnosticOutput ? '1:1 맞춤 진단 완료' : '실시간 진단 진행 중'}</span>
+              <span className={`w-2 h-2 rounded-full ${serviceUnavailable ? 'bg-amber-500' : hasDiagnosticOutput ? 'bg-emerald-600' : 'bg-blue-500'}`} />
+              <span>{serviceUnavailable ? '자동 분석 연결 실패' : hasDiagnosticOutput ? '1:1 맞춤 진단 완료' : '상담 대기 중'}</span>
             </div>
 
             <div className="flex items-center gap-2">
-              {/* PDF Report Download Button */}
-              <button
+              {/* Show a report only after a real diagnostic response. */}
+              {hasDiagnosticOutput && <button
                 type="button"
                 onClick={() => setIsReportModalOpen(true)}
                 className="text-xs font-black text-[#122B49] bg-gradient-to-r from-amber-100 to-amber-200 hover:from-amber-200 hover:to-amber-300 border border-amber-300 px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
               >
                 <FileText className="w-3.5 h-3.5 text-[#C59750]" />
                 <span>맞춤 진단 리포트 PDF</span>
-              </button>
+              </button>}
 
               <button
                 type="button"
@@ -147,7 +149,7 @@ export const AIConsultationModal: React.FC<AIConsultationModalProps> = ({
                 message={msg}
                 onSelectQuickReply={onSendMessage}
                 onOpenReservationModal={onOpenReservationModal}
-                onOpenDiagnosticReport={() => setIsReportModalOpen(true)}
+                onOpenDiagnosticReport={hasDiagnosticOutput ? () => setIsReportModalOpen(true) : undefined}
               />
             ))}
 
@@ -169,7 +171,7 @@ export const AIConsultationModal: React.FC<AIConsultationModalProps> = ({
               selectedSchool={selectedSchool}
               onSendPresetMessage={onSendMessage}
               onOpenReservationModal={onOpenReservationModal}
-              onOpenDiagnosticReport={() => setIsReportModalOpen(true)}
+              onOpenDiagnosticReport={hasDiagnosticOutput ? () => setIsReportModalOpen(true) : undefined}
               onOpenSchoolGuide={() => {
                 if (selectedSchool) {
                   onSendMessage(`${selectedSchool.name} 출제 분석과 기출 경향을 자세히 알려주세요.`);
