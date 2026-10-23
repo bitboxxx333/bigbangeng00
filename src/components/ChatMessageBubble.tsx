@@ -248,7 +248,7 @@ export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
                   onClick={onOpenReservationModal}
                   className="w-full py-2.5 bg-[#0F2A4A] hover:bg-[#183a63] text-white font-bold rounded-lg text-xs transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
                 >
-                  <span>30초 만에 간편 예약 신청하기</span>
+                  <span>방문 상담 문의 방법 확인하기</span>
                   <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
