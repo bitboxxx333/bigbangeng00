@@ -37,6 +37,7 @@ export const QuickReservationCard: React.FC<QuickReservationCardProps> = ({
       : '학교별 기출 분석 및 1:1 학습 진단 상담 신청합니다.';
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [apiAvailable, setApiAvailable] = useState(false);
   const [submittedData, setSubmittedData] = useState<Reservation | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [openChatUrl, setOpenChatUrl] = useState(ACADEMY_INFO.kakaoChannelUrl);
@@ -45,6 +46,14 @@ export const QuickReservationCard: React.FC<QuickReservationCardProps> = ({
   const [methodCSent, setMethodCSent] = useState(false);
 
   useEffect(() => {
+    fetch('/api/reservations')
+      .then(async (res) => {
+        if (!res.ok || !res.headers.get('content-type')?.includes('application/json')) return false;
+        const data = await res.json();
+        return typeof data.count === 'number';
+      })
+      .then(setApiAvailable)
+      .catch(() => setApiAvailable(false));
     fetch('/api/settings')
       .then((res) => res.json())
       .then((data) => {
@@ -57,9 +66,7 @@ export const QuickReservationCard: React.FC<QuickReservationCardProps> = ({
 
   // Sync prefilled values
   React.useEffect(() => {
-    if (prefilledSchool) {
-      setSchool(prefilledSchool);
-    }
+    setSchool(prefilledSchool || '');
   }, [prefilledSchool]);
 
   React.useEffect(() => {
@@ -98,6 +105,14 @@ export const QuickReservationCard: React.FC<QuickReservationCardProps> = ({
       return;
     }
 
+    if (grade.includes('예비고1') && ['동인천고', '숭덕여고', '문일여고', '만수고', '인제고', '신명여고'].includes(school)) {
+      setError('예비고1은 현재 중3 대상입니다. 재학 학교를 다시 선택해 주세요.');
+      return;
+    }
+    if (!apiAvailable) {
+      setError('온라인 접수가 연결되지 않았습니다. 전화 또는 카카오톡으로 문의해 주세요.');
+      return;
+    }
     setIsSubmitting(true);
     setError(null);
 
@@ -112,8 +127,8 @@ export const QuickReservationCard: React.FC<QuickReservationCardProps> = ({
           grade: grade,
           concerns: ['학교별 기출 정밀 진단 및 1:1 상담'],
           notes: message,
-          preferredDate: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
-          preferredTime: '18:00',
+          preferredDate: '일정 협의',
+          preferredTime: '일정 협의',
         }),
       });
 
@@ -128,7 +143,7 @@ export const QuickReservationCard: React.FC<QuickReservationCardProps> = ({
         setError(data.error || '예약 중 오류가 발생했습니다.');
       }
     } catch (err: any) {
-      setError('네트워크 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+      setError('온라인 접수가 확인되지 않았습니다. 예약은 완료되지 않았습니다. 전화 또는 카카오톡으로 문의해 주세요.');
     } finally {
       setIsSubmitting(false);
     }
@@ -192,7 +207,7 @@ export const QuickReservationCard: React.FC<QuickReservationCardProps> = ({
               <div className="flex items-center justify-between">
                 <span>• 접수번호: <strong>{submittedData.id}</strong></span>
                 <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
-                  원장님 실시간 알림 완료
+                  접수 기록 확인
                 </span>
               </div>
               <div>• 학생: {submittedData.studentName} ({submittedData.school} {submittedData.grade})</div>
@@ -310,6 +325,7 @@ export const QuickReservationCard: React.FC<QuickReservationCardProps> = ({
                   type="button"
                   onClick={() => {
                     setGrade('2027 예비고1 (현 중3)');
+                    setSchool('');
                     setMessage('2027 예비고1 고등영어 정밀 진단예약 신청합니다.');
                     setIsPrep2027Mode(true);
                   }}
@@ -374,12 +390,12 @@ export const QuickReservationCard: React.FC<QuickReservationCardProps> = ({
                     className="w-full px-2.5 py-2.5 bg-slate-50 border border-slate-300 focus:border-[#122B49] focus:bg-white rounded-lg text-xs sm:text-sm transition focus:outline-hidden font-medium"
                   >
                     <option value="" disabled>재학 중인 학교 선택</option>
-                    <option value="동인천고">동인천고</option>
-                    <option value="숭덕여고">숭덕여고</option>
-                    <option value="문일여고">문일여고</option>
-                    <option value="만수고">만수고</option>
-                    <option value="인제고">인제고</option>
-                    <option value="신명여고">신명여고</option>
+                    <option value="동인천고" disabled={grade.includes('예비고1')}>동인천고</option>
+                    <option value="숭덕여고" disabled={grade.includes('예비고1')}>숭덕여고</option>
+                    <option value="문일여고" disabled={grade.includes('예비고1')}>문일여고</option>
+                    <option value="만수고" disabled={grade.includes('예비고1')}>만수고</option>
+                    <option value="인제고" disabled={grade.includes('예비고1')}>인제고</option>
+                    <option value="신명여고" disabled={grade.includes('예비고1')}>신명여고</option>
                     <option value="만수북중">만수북중</option>
                     <option value="만수중">만수중</option>
                     <option value="만수여중">만수여중</option>
@@ -399,6 +415,7 @@ export const QuickReservationCard: React.FC<QuickReservationCardProps> = ({
                   value={grade}
                   onChange={(e) => {
                     setGrade(e.target.value);
+                     setSchool('');
                     if (e.target.value.includes('예비고1')) {
                       setIsPrep2027Mode(true);
                     } else {
@@ -438,10 +455,12 @@ export const QuickReservationCard: React.FC<QuickReservationCardProps> = ({
               </div>
             </div>
 
+            <p className="text-[11px] text-slate-600">이름·연락처·학교·학년은 상담 접수 및 회신에 사용됩니다. 방문일시는 학원과 별도 협의합니다.</p>
+            {!apiAvailable && <div role="status" className="p-2.5 bg-amber-50 border border-amber-300 rounded-lg text-xs text-amber-950">온라인 접수는 현재 준비 중입니다. 입력한 내용은 전송되지 않습니다. <a href="tel:032-471-7525" className="underline font-bold">전화 문의</a> · <a href={openChatUrl} target="_blank" rel="noopener noreferrer" className="underline font-bold">카카오톡 문의</a></div>}
             {/* Warm Mustard / Caramel CTA Button matching the reference image */}
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !apiAvailable}
               className="w-full bg-[#C59750] hover:bg-[#B58540] disabled:opacity-50 text-white font-extrabold text-sm sm:text-base py-3 rounded-xl transition shadow-md hover:shadow-lg active:scale-98 cursor-pointer flex items-center justify-center gap-2 mt-2"
             >
               {isSubmitting ? (
@@ -449,7 +468,7 @@ export const QuickReservationCard: React.FC<QuickReservationCardProps> = ({
               ) : (
                 <>
                   <Send className="w-4 h-4 text-white" />
-                  <span>예약 신청</span>
+                  <span>{apiAvailable ? '상담 요청' : '온라인 접수 준비 중'}</span>
                 </>
               )}
             </button>

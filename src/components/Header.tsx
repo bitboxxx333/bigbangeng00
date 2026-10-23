@@ -84,7 +84,7 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={() => onNavigateSection('achievements')}
             className="hover:text-[#122B49] transition cursor-pointer py-1"
           >
-            합격 후기
+            성적 향상 사례
           </button>
           <button
             type="button"

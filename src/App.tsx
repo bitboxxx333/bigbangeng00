@@ -20,6 +20,7 @@ import { Sparkles, Phone, MapPin, Award, MessageCircle } from 'lucide-react';
 export default function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [chatUnavailable, setChatUnavailable] = useState(false);
   const [currentStage, setCurrentStage] = useState<ConsultationStage>(1);
   const [selectedSchool, setSelectedSchool] = useState<SchoolData | undefined>(undefined);
   const [selectedGrade, setSelectedGrade] = useState<string>('');
@@ -40,7 +41,7 @@ export default function App() {
   const [isReservationModalOpen, setIsReservationModalOpen] = useState(false);
   const [isAdminDrawerOpen, setIsAdminDrawerOpen] = useState(false);
   const [reservations, setReservations] = useState<Reservation[]>([]);
-  const [reservationCount, setReservationCount] = useState<number>(3);
+  const [reservationCount, setReservationCount] = useState<number>(0);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
     return sessionStorage.getItem('bigbang_admin_auth') === 'true';
   });
@@ -89,7 +90,10 @@ export default function App() {
           }
         }
       })
-      .catch((err) => console.log('Reservation load error:', err));
+      .catch((err) => {
+        console.log('Reservation load error:', err);
+        setIsAdminAuthenticated(false);
+      });
 
     // Check season campaign setting
     fetch('/api/settings')
@@ -134,6 +138,7 @@ export default function App() {
 
     setMessages((prev) => changingSchool ? [userMessage] : [...prev, userMessage]);
     setIsLoading(true);
+    setChatUnavailable(false);
     if (detectedSchool && detectedSchool.name !== selectedSchool?.name) {
       setSelectedSchool(detectedSchool);
     }
@@ -176,7 +181,13 @@ export default function App() {
         }),
       });
 
+      if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) {
+        throw new Error('Chat API unavailable');
+      }
       const data = await response.json();
+      if (typeof data.text !== 'string' || !data.text.trim()) {
+        throw new Error('Invalid chat response');
+      }
       if (requestVersion !== chatRequestVersion.current) return;
       const aiTimestamp = new Date().toLocaleTimeString('ko-KR', {
         hour: '2-digit',
@@ -201,17 +212,18 @@ export default function App() {
     } catch (error) {
       if (requestVersion !== chatRequestVersion.current) return;
       console.error('Chat error:', error);
+      setChatUnavailable(true);
+      setCurrentStage(detectedSchool ? 2 : 1);
       const fallbackAi: ChatMessage = {
         id: `ai-err-${Date.now()}`,
         sender: 'ai',
-        text: `빅뱅영어학원에서는 **${detectedSchool?.name || '만수동 학교'}** 학생들을 위해 1:1 맞춤 정밀 레벨테스트(60분)를 상시 무료로 진행하고 있습니다.\n\n편하신 방문 일정을 남겨주시면 원장님 직접 상담으로 친절히 안내해 드리겠습니다!`,
+        text: '현재 자동 분석 서비스에 연결되지 않아 학교별 분석과 진단 리포트를 제공하지 못했습니다. 진단이 완료된 것은 아닙니다. 상담을 원하시면 032-471-7525로 전화하거나 카카오톡 1:1 상담을 이용해 주세요.',
         timestamp: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
-        stage: 4,
-        showReservationForm: true,
-        suggestedQuickReplies: ['무료 레벨테스트 예약하기', '학원 위치 및 전화 문의'],
+        stage: detectedSchool ? 2 : 1,
+        showReservationForm: false,
+        suggestedQuickReplies: [],
       };
       setMessages((prev) => [...prev, fallbackAi]);
-      setCurrentStage(4);
     } finally {
       if (requestVersion === chatRequestVersion.current) setIsLoading(false);
     }
@@ -221,6 +233,7 @@ export default function App() {
   const handleResetConsultation = () => {
     chatRequestVersion.current++;
     setIsLoading(false);
+    setChatUnavailable(false);
     setCurrentStage(1);
     setSelectedSchool(undefined);
     setSelectedGrade('');
@@ -255,7 +268,7 @@ export default function App() {
     const confirmMessage: ChatMessage = {
       id: `ai-confirmed-${Date.now()}`,
       sender: 'ai',
-      text: `🎉 **${newRes.studentName} 학생의 무료 레벨테스트 예약이 접수되었습니다!**\n\n- 예약 번호: ${newRes.id}\n- 학교/학년: ${newRes.school} ${newRes.grade}\n- 연락처: ${newRes.parentPhone}\n\n상담실장이 접수 확인 후 안내 문자를 발송해 드립니다. 시험지나 평소 풀던 교재를 지참해 주세요! 😊`,
+      text: `🎉 **${newRes.studentName} 학생의 무료 레벨테스트 예약이 접수되었습니다!**\n\n- 예약 번호: ${newRes.id}\n- 학교/학년: ${newRes.school} ${newRes.grade}\n- 연락처: ${newRes.parentPhone}\n\n상담실장이 접수 확인 후 방문 일정을 안내해 드릴 예정입니다. 시험지나 평소 풀던 교재를 지참해 주세요! 😊`,
       timestamp: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
       stage: 4,
     };
@@ -317,6 +330,8 @@ export default function App() {
   const handleOpenPrepReservation = (preset?: { grade?: string; concern?: string; school?: string }) => {
     const targetGrade = preset?.grade || '2027 예비고1 (현 중3)';
     setSelectedGrade(targetGrade);
+    // This campaign is for current middle-school third graders, not the previous chat student.
+    setSelectedSchool(preset?.school ? TARGET_SCHOOLS.find((school) => school.name === preset.school || school.badge === preset.school) : undefined);
     if (preset?.concern) {
       setSelectedConcerns([preset.concern]);
     } else {
@@ -521,6 +536,7 @@ export default function App() {
         onClose={() => setIsAIChatModalOpen(false)}
         messages={messages}
         isLoading={isLoading}
+        serviceUnavailable={chatUnavailable}
         currentStage={currentStage}
         selectedSchool={selectedSchool}
         selectedGrade={selectedGrade}
