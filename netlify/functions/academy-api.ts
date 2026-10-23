@@ -43,7 +43,7 @@ export default async (request: Request) => {
       if (!validAdmin(request)) return json({ count: entries.blobs.length, available: true });
       const reservations = await Promise.all(entries.blobs.map(({ key }) => records.get(key, { type: 'json' })));
       const sorted = reservations.filter(Boolean).sort((a: any, b: any) => b.createdAt.localeCompare(a.createdAt));
-      return json({ count: sorted.length, reservations: sorted, available: true });
+      return json({ count: sorted.length, reservations: sorted, authorized: true, available: true });
     }
     if (route === 'reservations' && request.method === 'POST') {
       if (!request.headers.get('content-type')?.includes('application/json')) return json({ error: '잘못된 요청입니다.' }, 415);
