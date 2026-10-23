@@ -1,0 +1,41 @@
+[[redirects]]
+  from = "/api/reservations/:id/status"
+  to = "/.netlify/functions/academy-api?route=status&id=:id"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/reservations/:id/test"
+  to = "/.netlify/functions/academy-api?route=delete-test&id=:id"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/reservations"
+  to = "/.netlify/functions/academy-api?route=reservations"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/admin/verify"
+  to = "/.netlify/functions/academy-api?route=verify"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/admin/settings"
+  to = "/.netlify/functions/academy-api?route=admin-settings"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/admin/test-notify"
+  to = "/.netlify/functions/academy-api?route=test-notify"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/settings"
+  to = "/.netlify/functions/academy-api?route=settings"
+  status = 200
+  force = true
