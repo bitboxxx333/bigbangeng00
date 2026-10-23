@@ -17,10 +17,61 @@ import { ChatMessage, ConsultationStage, Reservation, SchoolData } from './types
 import { TARGET_SCHOOLS, OTHER_SCHOOL_INFO, ACADEMY_INFO, isPrep2027Active } from './data/schools';
 import { Sparkles, Phone, MapPin, Award, MessageCircle } from 'lucide-react';
 
+type GuidedReply = { text: string; stage: ConsultationStage; suggestedReplies: string[] };
+
+function buildGuidedReply(message: string, school: SchoolData | undefined, grade: string, concern: string, stage: ConsultationStage): GuidedReply {
+  if (!school) {
+    return {
+      stage: 1,
+      text: (message.includes('예비고1') || message.includes('2027')
+        ? '2027 예비고1 진단은 현재 중3 학생을 위한 안내입니다. '
+        : '') + '먼저 학생의 재학 학교를 알려주세요. 학교와 학년을 확인한 뒤 고민과 방문 상담 순서로 안내하겠습니다.',
+      suggestedReplies: ['동인천고 1학년입니다', '숭덕여고 2학년이에요', '정각중 2학년입니다'],
+    };
+  }
+  if (!grade) {
+    return {
+      stage: 1,
+      text: school.badge + ' 학생이시군요. 현재 학년을 알려주시면 다음으로 가장 고민되는 영어 영역을 여쭙겠습니다.',
+      suggestedReplies: school.type === 'middle' ? ['중1입니다', '중2입니다', '중3입니다'] : ['고1입니다', '고2입니다', '고3입니다'],
+    };
+  }
+  if (!concern && stage <= 2) {
+    return {
+      stage: 2,
+      text: school.badge + ' ' + grade + ' 학생으로 확인했습니다. 가장 고민되는 영역은 무엇인가요? 한 가지를 골라주시면 학교별 안내 자료를 바탕으로 준비 방향을 설명드리겠습니다.',
+      suggestedReplies: ['내신 서술형 영작 감점이 심해요', '문법 기초 개념 부족', '어휘력 부족 & 암기 취약', '독해 속도 및 시간 부족', '모의고사/부교재 변형 대비'],
+    };
+  }
+  if (stage >= 3 && /예약|방문|일정|신청|시간|전화|카카오|위치/.test(message)) {
+    return {
+      stage: 4,
+      text: '무료 레벨테스트와 방문 상담을 원하시는군요. 날짜와 시간을 함께 조율하겠습니다. 다만 현재 온라인 예약 접수 서버는 연결되지 않아 이 대화만으로 예약이 확정되지 않습니다. 예약 양식의 전화 또는 카카오톡 문의로 학원에 직접 연락해 주세요. 상담 전화: 032-471-7525.',
+      suggestedReplies: ['학원 위치 및 전화 문의', '학교별 준비 방향 다시 알려주세요'],
+    };
+  }
+  const focus = school.targetFocus;
+  const advice = /서술형|영작/.test(concern)
+    ? '조건에 표시된 시제·수일치·어형 변화를 답안별로 점검하고, 실제 감점 항목은 최근 시험지와 함께 확인하는 것이 좋습니다.'
+    : /문법/.test(concern)
+    ? '헷갈리는 문법 개념을 문장 속 근거와 연결해 보고, 틀린 문항의 이유를 설명하는 연습부터 시작해 보세요.'
+    : /어휘|단어/.test(concern)
+    ? '빈출 어휘를 문맥·유의어·반의어와 묶어서 복습하고, 암기 후 문장 적용까지 확인해 보세요.'
+    : /독해|시간/.test(concern)
+    ? '문장 구조를 먼저 파악한 뒤 제한 시간을 두고 지문을 읽으며 병목 구간을 확인해 보세요.'
+    : '최근 시험지와 학습 자료를 대조해 어려웠던 유형을 먼저 확인하는 것이 좋습니다.';
+  return {
+    stage: 3,
+    text: school.badge + ' ' + grade + ' 학생의 고민을 ' + concern + '(으)로 이해했습니다. 학원에 게시된 학교별 대비 초점은 "' + focus + '"입니다.\n\n' + advice + '\n\n이 내용은 단계별 상담 안내이며, 실제 시험지 분석이나 개인 진단이 완료된 것은 아닙니다. 무료 레벨테스트와 방문 상담을 원하시면 알려주세요.',
+    suggestedReplies: ['무료 레벨테스트 방문 상담 방법', '학원 위치 및 전화 문의'],
+  };
+}
+
 export default function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [chatUnavailable, setChatUnavailable] = useState(false);
+  const [guidedMode, setGuidedMode] = useState(false);
+  const [reportReady, setReportReady] = useState(false);
   const [currentStage, setCurrentStage] = useState<ConsultationStage>(1);
   const [selectedSchool, setSelectedSchool] = useState<SchoolData | undefined>(undefined);
   const [selectedGrade, setSelectedGrade] = useState<string>('');
@@ -51,7 +102,7 @@ export default function App() {
     const initialGreeting: ChatMessage = {
       id: 'msg-init',
       sender: 'ai',
-      text: `안녕하세요! 인천 만수동 **빅뱅영어학원**의 **1차 상담 및 학습진단 전담 AI 상담실장**입니다. 😊\n\n저희 학원은 **동인천고·숭덕여고·문일여고·만수고·인제고·신명여고 / 만수북중·만수중·만수여중·간석여중·정각중** 5개년 기출 DB를 기반으로 학교별 서술형 감점 요인과 킬러 문항을 1:1로 정밀하게 진단합니다.\n\n학생의 **재학 중인 학교와 학년**, 그리고 현재 영어 공부에서 **가장 답답한 점**을 말씀해 주시면 맞춤 솔루션을 안내해 드립니다!`,
+      text: '안녕하세요. 빅뱅영어학원 단계별 상담 안내입니다. 재학 학교와 학년을 알려주시면 학습 고민을 듣고 준비 방향과 방문 상담 방법을 차례로 안내하겠습니다. 실제 개인 진단은 방문 상담과 시험지 확인 후 진행됩니다.',
       timestamp: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
       stage: 1,
       suggestedQuickReplies: [
@@ -106,124 +157,102 @@ export default function App() {
       .catch(() => {});
   }, []);
 
-  // Main Chat Send Message Function
+  // The deployed static site can continue the scripted four-step guide when /api/chat is unavailable.
   const handleSendMessage = async (textToSend: string, overrideSchool?: SchoolData) => {
     const messageContent = textToSend.trim();
     if (!messageContent) return;
-
-    // Detect the school on every message. A previous selection must not override a new one.
     const schoolInMessage = TARGET_SCHOOLS.find((school) =>
       messageContent.includes(school.badge) || messageContent.includes(school.name)
     );
     const otherSchoolInMessage = !schoolInMessage &&
       ['초등', '기타', '초등학교', '인근'].some((keyword) => messageContent.includes(keyword));
+    const isPrepInquiry = /예비고1|2027/.test(messageContent) && !schoolInMessage && !overrideSchool;
     const detectedSchool = overrideSchool || schoolInMessage ||
-      (otherSchoolInMessage ? OTHER_SCHOOL_INFO : selectedSchool);
-    const changingSchool = Boolean(selectedSchool && detectedSchool && selectedSchool.name !== detectedSchool.name);
-
-    // Allow a school change even while a previous reply is pending, and discard that stale reply.
+      (otherSchoolInMessage ? OTHER_SCHOOL_INFO : isPrepInquiry ? undefined : selectedSchool);
+    const changingSchool = Boolean(selectedSchool &&
+      (isPrepInquiry || (detectedSchool && selectedSchool.name !== detectedSchool.name)));
     if (isLoading && !changingSchool) return;
     const requestVersion = ++chatRequestVersion.current;
-
-    const userTimestamp = new Date().toLocaleTimeString('ko-KR', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    const timestamp = () => new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
     const userMessage: ChatMessage = {
-      id: `usr-${Date.now()}`,
-      sender: 'user',
-      text: messageContent,
-      timestamp: userTimestamp,
+      id: 'usr-' + Date.now(), sender: 'user', text: messageContent, timestamp: timestamp(),
     };
-
     setMessages((prev) => changingSchool ? [userMessage] : [...prev, userMessage]);
     setIsLoading(true);
-    setChatUnavailable(false);
-    if (detectedSchool && detectedSchool.name !== selectedSchool?.name) {
-      setSelectedSchool(detectedSchool);
-    }
     if (changingSchool) {
       setCurrentStage(1);
-      setSelectedGrade('');
       setSelectedConcerns([]);
+      setReportReady(false);
     }
+    if (isPrepInquiry) setSelectedSchool(undefined);
+    else if (detectedSchool?.name !== selectedSchool?.name) setSelectedSchool(detectedSchool);
 
-    // A new school also starts a new grade and conversation context.
-    let detectedGrade = changingSchool ? '' : selectedGrade;
+    let detectedGrade = isPrepInquiry ? '2027 예비고1 (현 중3)' : changingSchool ? '' : selectedGrade;
     if (!detectedGrade) {
-      if (messageContent.includes('고1') || messageContent.includes('고등학교 1')) detectedGrade = '고1';
-      else if (messageContent.includes('고2') || messageContent.includes('고등학교 2')) detectedGrade = '고2';
-      else if (messageContent.includes('고3') || messageContent.includes('고등학교 3')) detectedGrade = '고3';
-      else if (messageContent.includes('중1') || messageContent.includes('중학교 1')) detectedGrade = '중1';
-      else if (messageContent.includes('중2') || messageContent.includes('중학교 2')) detectedGrade = '중2';
-      else if (messageContent.includes('중3') || messageContent.includes('중학교 3')) detectedGrade = '중3';
+      if (/고1|고등학교 1/.test(messageContent)) detectedGrade = '고1';
+      else if (/고2|고등학교 2/.test(messageContent)) detectedGrade = '고2';
+      else if (/고3|고등학교 3/.test(messageContent)) detectedGrade = '고3';
+      else if (/중1|중학교 1/.test(messageContent)) detectedGrade = '중1';
+      else if (/중2|중학교 2/.test(messageContent)) detectedGrade = '중2';
+      else if (/중3|중학교 3/.test(messageContent)) detectedGrade = '중3';
       else if (messageContent.includes('초등')) detectedGrade = '초등';
       else {
         const yearMatch = messageContent.match(/([1-3])학년/);
         if (yearMatch && detectedSchool && detectedSchool !== OTHER_SCHOOL_INFO) {
-          detectedGrade = `${detectedSchool.badge.includes('중') ? '중' : '고'}${yearMatch[1]}`;
+          detectedGrade = (detectedSchool.type === 'middle' ? '중' : '고') + yearMatch[1];
         }
       }
-      if (detectedGrade) setSelectedGrade(detectedGrade);
     }
+    if (detectedGrade !== selectedGrade) setSelectedGrade(detectedGrade);
+    const effectiveStage = changingSchool ? 1 : currentStage;
+    const concernFromMessage = effectiveStage >= 2 && /서술형|영작|문법|어휘|단어|독해|모의고사|부교재|시험 시간/.test(messageContent)
+      ? messageContent.replace(/^가장 큰 영어 고민은 ['"]?|['"]? 입니다\.?$/g, '').slice(0, 90) : '';
+    const concern = changingSchool || isPrepInquiry ? '' : concernFromMessage || selectedConcerns[0] || '';
+    if (concernFromMessage && !changingSchool) setSelectedConcerns((prev) => prev.includes(concernFromMessage) ? prev : [concernFromMessage]);
 
+    const appendGuidedReply = () => {
+      const reply = buildGuidedReply(messageContent, detectedSchool, detectedGrade, concern, effectiveStage);
+      setCurrentStage(reply.stage);
+      setMessages((prev) => [...prev, {
+        id: 'guide-' + Date.now(), sender: 'ai', text: reply.text, timestamp: timestamp(),
+        stage: reply.stage, suggestedQuickReplies: reply.suggestedReplies,
+        schoolData: detectedSchool, showReservationForm: reply.stage >= 3,
+      }]);
+    };
+    if (guidedMode) {
+      appendGuidedReply();
+      setIsLoading(false);
+      return;
+    }
     try {
       const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: messageContent,
-          messagesHistory: changingSchool ? [] : messages,
-          school: detectedSchool?.name,
-          grade: detectedGrade,
-          concern: changingSchool ? '' : selectedConcerns.join(', '),
-          stage: changingSchool ? 1 : currentStage,
+          message: messageContent, messagesHistory: changingSchool ? [] : messages,
+          school: detectedSchool?.name, grade: detectedGrade, concern,
+          stage: effectiveStage,
         }),
       });
-
       if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) {
         throw new Error('Chat API unavailable');
       }
       const data = await response.json();
-      if (typeof data.text !== 'string' || !data.text.trim()) {
-        throw new Error('Invalid chat response');
-      }
+      if (typeof data.text !== 'string' || !data.text.trim()) throw new Error('Invalid chat response');
       if (requestVersion !== chatRequestVersion.current) return;
-      const aiTimestamp = new Date().toLocaleTimeString('ko-KR', {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-
-      const nextStage = (data.stage || (changingSchool ? 1 : currentStage)) as ConsultationStage;
+      const nextStage = (data.stage || effectiveStage) as ConsultationStage;
       setCurrentStage(nextStage);
-
-      const aiMessage: ChatMessage = {
-        id: `ai-${Date.now()}`,
-        sender: 'ai',
-        text: data.text || '상담 내용을 정밀하게 분석 중입니다.',
-        timestamp: aiTimestamp,
-        stage: nextStage,
-        suggestedQuickReplies: data.suggestedReplies || [],
-        schoolData: detectedSchool,
-        showReservationForm: nextStage >= 3,
-      };
-
-      setMessages((prev) => [...prev, aiMessage]);
+      setReportReady(data.diagnosticComplete === true);
+      setMessages((prev) => [...prev, {
+        id: 'ai-' + Date.now(), sender: 'ai', text: data.text, timestamp: timestamp(),
+        stage: nextStage, suggestedQuickReplies: data.suggestedReplies || [],
+        schoolData: detectedSchool, showReservationForm: nextStage >= 3,
+      }]);
     } catch (error) {
       if (requestVersion !== chatRequestVersion.current) return;
-      console.error('Chat error:', error);
-      setChatUnavailable(true);
-      setCurrentStage(detectedSchool ? 2 : 1);
-      const fallbackAi: ChatMessage = {
-        id: `ai-err-${Date.now()}`,
-        sender: 'ai',
-        text: '현재 자동 분석 서비스에 연결되지 않아 학교별 분석과 진단 리포트를 제공하지 못했습니다. 진단이 완료된 것은 아닙니다. 상담을 원하시면 032-471-7525로 전화하거나 카카오톡 1:1 상담을 이용해 주세요.',
-        timestamp: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
-        stage: detectedSchool ? 2 : 1,
-        showReservationForm: false,
-        suggestedQuickReplies: [],
-      };
-      setMessages((prev) => [...prev, fallbackAi]);
+      console.error('Chat API unavailable, continuing guided consultation:', error);
+      setGuidedMode(true);
+      setReportReady(false);
+      appendGuidedReply();
     } finally {
       if (requestVersion === chatRequestVersion.current) setIsLoading(false);
     }
@@ -233,7 +262,8 @@ export default function App() {
   const handleResetConsultation = () => {
     chatRequestVersion.current++;
     setIsLoading(false);
-    setChatUnavailable(false);
+    setGuidedMode(false);
+    setReportReady(false);
     setCurrentStage(1);
     setSelectedSchool(undefined);
     setSelectedGrade('');
@@ -523,7 +553,7 @@ export default function App() {
             >
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
               <Sparkles className="w-4 h-4 text-[#C59750] group-hover:rotate-12 transition-transform" />
-              <span>AI 상담실장 1:1 진단 (실시간)</span>
+              <span>AI 상담실장 단계별 상담</span>
             </button>
           </div>
         </>
@@ -536,7 +566,8 @@ export default function App() {
         onClose={() => setIsAIChatModalOpen(false)}
         messages={messages}
         isLoading={isLoading}
-        serviceUnavailable={chatUnavailable}
+        guidedMode={guidedMode}
+        reportReady={reportReady}
         currentStage={currentStage}
         selectedSchool={selectedSchool}
         selectedGrade={selectedGrade}
