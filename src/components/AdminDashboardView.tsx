@@ -512,7 +512,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
                               <a
                                 href={getDirectSmsUrl(r, r.parentPhone)}
                                 className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition"
-                                title="문자 발송"
+                                title="문자앱 열기 (수동)"
                               >
                                 <Smartphone className="w-3.5 h-3.5" />
                               </a>
@@ -633,128 +633,9 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
 
         {/* Tab 3: Notifications Settings */}
         {activeTab === 'notifications' && (
-          <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-2xs space-y-6">
-            <div className="border-b border-slate-100 pb-3">
-              <h3 className="text-lg font-black text-[#122B49] flex items-center gap-2">
-                <Bell className="w-5 h-5 text-amber-600" />
-                <span>원장님 스마트폰 실시간 자동 알림 연동</span>
-              </h3>
-              <p className="text-xs text-slate-500 mt-1">
-                학부모가 상담을 신청하면 학부모의 조작 없이 0.1초 만에 원장님 스마트폰으로 즉시 알림이 발송됩니다.
-              </p>
-            </div>
-
-            {/* Test Notification Push Button */}
-            <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-xl flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <span className="font-extrabold text-sm text-[#122B49] block">
-                  실시간 알림 테스트 발송
-                </span>
-                <span className="text-xs text-slate-600">
-                  등록된 스마트폰(텔레그램 또는 웹훅)으로 즉시 테스트 알림이 도착하는지 확인합니다.
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={handleSendTestNotification}
-                disabled={isSendingTest}
-                className="py-2.5 px-4 bg-[#122B49] hover:bg-[#1a385c] text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
-              >
-                <Send className="w-3.5 h-3.5 text-amber-300" />
-                <span>{isSendingTest ? '전송 중...' : '원장님 스마트폰으로 테스트 알림 발송'}</span>
-              </button>
-            </div>
-
-            {testNotificationFeedback && (
-              <div className="p-3 bg-blue-50 border border-blue-200 text-blue-900 text-xs font-bold rounded-xl flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
-                <span>{testNotificationFeedback}</span>
-              </div>
-            )}
-
-            {/* Form */}
-            <form onSubmit={handleSaveSettings} className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 block">
-                  원장님 휴대폰 번호 (직통 문자 수신용)
-                </label>
-                <input
-                  type="text"
-                  value={directorMobile}
-                  onChange={(e) => setDirectorMobile(e.target.value)}
-                  placeholder="010-2006-7525"
-                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs font-semibold focus:outline-hidden focus:ring-2 focus:ring-[#122B49] bg-slate-50"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 block">
-                  학원 공식 카카오톡 1:1 오픈채팅방 URL (주소 변경 시 여기에 입력)
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="url"
-                    value={openChatUrl}
-                    onChange={(e) => setOpenChatUrl(e.target.value)}
-                    placeholder="https://open.kakao.com/o/xxxxxx"
-                    className="flex-1 px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs font-semibold focus:outline-hidden focus:ring-2 focus:ring-[#122B49] bg-slate-50"
-                  />
-                  <a
-                    href={openChatUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition flex items-center gap-1 text-xs shrink-0"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    <span>링크 확인</span>
-                  </a>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700 block">
-                    텔레그램 봇 토큰 (스마트폰 푸시용 / 선택)
-                  </label>
-                  <input
-                    type="text"
-                    value={telegramBotToken}
-                    onChange={(e) => setTelegramBotToken(e.target.value)}
-                    placeholder="123456789:ABCdefGh..."
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono bg-slate-50 focus:outline-hidden"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700 block">
-                    텔레그램 Chat ID (원장님 계정 ID / 선택)
-                  </label>
-                  <input
-                    type="text"
-                    value={telegramChatId}
-                    onChange={(e) => setTelegramChatId(e.target.value)}
-                    placeholder="숫자 입력"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono bg-slate-50 focus:outline-hidden"
-                  />
-                </div>
-              </div>
-
-              {settingsSaveMsg && (
-                <div className="p-3 bg-emerald-50 border border-emerald-300 text-emerald-800 font-bold text-xs rounded-xl flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>{settingsSaveMsg}</span>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={isSavingSettings}
-                className="w-full py-3 bg-[#122B49] hover:bg-[#1a385c] text-white font-bold text-xs sm:text-sm rounded-xl transition flex items-center justify-center gap-2 cursor-pointer shadow-md disabled:opacity-50"
-              >
-                <Save className="w-4 h-4 text-amber-300" />
-                <span>{isSavingSettings ? '저장 중...' : '알림 및 오픈채팅 주소 저장하기'}</span>
-              </button>
-            </form>
+          <div className="bg-white p-6 sm:p-8 rounded-2xl border border-amber-200 shadow-2xs space-y-3">
+            <h3 className="text-lg font-black text-[#122B49]">자동 문자 알림 미설정</h3>
+            <p className="text-sm text-slate-700">상담 신청은 비공개 접수 대장에 저장됩니다. 원장님께 자동 문자나 푸시 알림은 아직 발송되지 않습니다. 새 접수는 이 관리자 화면에서 확인해 주세요.</p>
           </div>
         )}
 
