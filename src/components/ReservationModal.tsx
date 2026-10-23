@@ -217,7 +217,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
                   <CheckCircle2 className="w-7 h-7" />
                 </div>
                 <h4 className="font-bold text-emerald-950 text-base">
-                  무료 레벨테스트 예약이 성공적으로 접수되었습니다!
+                  무료 레벨테스트 상담 신청이 저장되었습니다.
                 </h4>
                 <p className="text-xs text-emerald-800 mt-1">
                   학원에서 접수 내역과 방문 희망일시를 확인한 뒤 연락드립니다.
@@ -232,7 +232,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
                       CONSULTATION TICKET
                     </span>
                     <p className="text-xs font-bold text-slate-900">
-                      예약 번호: {confirmedReservation.id}
+                      접수 번호: {confirmedReservation.id}
                     </p>
                   </div>
                   <span className="text-xs font-bold text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full">
@@ -285,45 +285,13 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
                 {/* Director Smartphone Real-Time Notification Status Badge */}
                 <div className="mt-3 py-2.5 px-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-center gap-2 text-xs text-emerald-900 font-bold">
                   <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                  <span>서버 접수 확인됨 · 방문 일정은 학원 확인 후 확정</span>
+                  <span>서버 저장 확인 · 방문 일정 미확정 · 자동 문자 미발송</span>
                 </div>
               </div>
 
               {/* Direct Communication Action Section */}
               <div className="p-4 bg-gradient-to-br from-blue-50/70 via-indigo-50/40 to-slate-50 border-2 border-blue-200 rounded-2xl space-y-3">
-                <div className="text-center space-y-1">
-                  <h5 className="font-black text-sm text-slate-900 flex items-center justify-center gap-1.5">
-                    <Smartphone className="w-4 h-4 text-blue-700" />
-                    <span>원장님께 예약 내용 바로 전송하기</span>
-                  </h5>
-                  <p className="text-xs text-slate-600 break-keep-all leading-normal">
-                    아래 문자 전송을 누르시면 내용이 100% 자동 채워져 붙여넣기 없이 전송됩니다.
-                  </p>
-                </div>
-
-                {/* 1. Primary Hero: Direct SMS Button (No Paste Needed!) */}
-                <a
-                  href={getDirectSmsUrl(confirmedReservation, directorMobile)}
-                  className="w-full py-4 px-4 bg-[#122B49] hover:bg-[#1b3d66] text-white font-extrabold text-sm rounded-xl transition flex items-center justify-between shadow-md cursor-pointer active:scale-[0.99] group"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-300 flex items-center justify-center shrink-0">
-                      <Smartphone className="w-5 h-5 text-amber-300" />
-                    </div>
-                    <div className="text-left">
-                      <div className="font-black text-white text-xs sm:text-sm flex items-center gap-1.5">
-                        <span>원장님 휴대폰으로 문자(SMS) 전송</span>
-                        <span className="text-[10px] bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full font-black">
-                          내용 자동완성
-                        </span>
-                      </div>
-                      <div className="text-[11px] text-slate-300 font-medium mt-0.5">
-                        터치 시 문자앱에 자동 입력 • 붙여넣기 불필요 (010-2006-7525)
-                      </div>
-                    </div>
-                  </div>
-                  <ExternalLink className="w-4 h-4 text-slate-300 opacity-70 group-hover:opacity-100 shrink-0" />
-                </a>
+                <p className="text-xs text-slate-700 text-center">자동 문자는 아직 발송되지 않습니다. 학원에서 접수 내용을 확인한 뒤 연락드립니다.</p>
 
                 {/* 2. Optional: KakaoTalk 1:1 Open Chat Button */}
                 <div className="pt-2 border-t border-slate-200/80 space-y-1.5">

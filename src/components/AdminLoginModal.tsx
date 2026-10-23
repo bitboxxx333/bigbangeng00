@@ -20,19 +20,6 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
 
   if (!isOpen) return null;
 
-  const isPinLocallyValid = (input: string) => {
-    const trimmed = input.trim();
-    const digits = trimmed.replace(/[^0-9]/g, '');
-    return (
-      digits === '7525' ||
-      digits === '2006' ||
-      digits.endsWith('7525') ||
-      digits.endsWith('2006') ||
-      trimmed === '7525' ||
-      trimmed === '2006'
-    );
-  };
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedPin = pinInput.trim();
@@ -53,50 +40,19 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
 
       if (res.ok) {
         const data = await res.json();
-        if (data.success) {
+        if (data.success && Array.isArray(data.reservations)) {
           sessionStorage.setItem('bigbang_admin_pin', trimmedPin);
           sessionStorage.setItem('bb_admin_pin', trimmedPin);
           sessionStorage.setItem('bigbang_admin_auth', 'true');
-          onLoginSuccess(data.reservations || [], trimmedPin);
+          onLoginSuccess(data.reservations, trimmedPin);
           onClose();
           return;
         }
       }
 
-      // Local fallback if server returns non-200 but PIN matches
-      if (isPinLocallyValid(trimmedPin)) {
-        sessionStorage.setItem('bigbang_admin_pin', trimmedPin);
-        sessionStorage.setItem('bb_admin_pin', trimmedPin);
-        sessionStorage.setItem('bigbang_admin_auth', 'true');
-        try {
-          const fetchRes = await fetch('/api/reservations', {
-            headers: { 'x-admin-pin': trimmedPin },
-          });
-          const fetchedData = await fetchRes.json();
-          if (fetchedData && Array.isArray(fetchedData.reservations)) {
-            onLoginSuccess(fetchedData.reservations, trimmedPin);
-            onClose();
-            return;
-          }
-        } catch {
-          // ignore
-        }
-        onLoginSuccess([], trimmedPin);
-        onClose();
-        return;
-      }
-
-      setErrorMessage('비밀번호가 올바르지 않습니다.');
+      setErrorMessage('관리자 인증에 실패했습니다. 비밀번호를 확인해 주세요.');
     } catch {
-      if (isPinLocallyValid(trimmedPin)) {
-        sessionStorage.setItem('bigbang_admin_pin', trimmedPin);
-        sessionStorage.setItem('bb_admin_pin', trimmedPin);
-        sessionStorage.setItem('bigbang_admin_auth', 'true');
-        onLoginSuccess([], trimmedPin);
-        onClose();
-      } else {
-        setErrorMessage('비밀번호가 올바르지 않습니다.');
-      }
+      setErrorMessage('관리자 서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.');
     } finally {
       setIsVerifying(false);
     }

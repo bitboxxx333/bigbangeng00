@@ -65,7 +65,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
   const [testNotificationFeedback, setTestNotificationFeedback] = useState('');
   const [campaignSyncMsg, setCampaignSyncMsg] = useState('');
 
-  const activePin = sessionStorage.getItem('bigbang_admin_pin') || '7525';
+  const activePin = sessionStorage.getItem('bigbang_admin_pin') || '';
 
   useEffect(() => {
     fetch('/api/admin/settings', {
@@ -337,7 +337,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
             }`}
           >
             <Settings className="w-4 h-4 text-sky-400" />
-            <span>실시간 알림 및 오픈채팅 설정</span>
+            <span>자동 알림 미연결 · 오픈채팅 설정</span>
           </button>
 
           <button

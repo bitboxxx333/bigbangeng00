@@ -79,7 +79,7 @@ export const AdminReservationDrawer: React.FC<AdminReservationDrawerProps> = ({
 
   useEffect(() => {
     if (isAdminAuthenticated) {
-      const pinToUse = activePin || '7525';
+      const pinToUse = activePin;
       fetch('/api/admin/settings', {
         headers: { 'x-admin-pin': pinToUse },
       })
@@ -101,18 +101,6 @@ export const AdminReservationDrawer: React.FC<AdminReservationDrawerProps> = ({
 
   if (!isOpen) return null;
 
-  const isPinLocallyValid = (input: string) => {
-    const trimmed = input.trim();
-    const digits = trimmed.replace(/[^0-9]/g, '');
-    return (
-      digits === '7525' ||
-      digits === '2006' ||
-      digits.endsWith('7525') ||
-      digits.endsWith('2006') ||
-      trimmed === '7525'
-    );
-  };
-
   const handleVerifyPin = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedPin = pinInput.trim();
@@ -133,12 +121,12 @@ export const AdminReservationDrawer: React.FC<AdminReservationDrawerProps> = ({
 
       if (res.ok) {
         const data = await res.json();
-        if (data.success) {
+        if (data.success && Array.isArray(data.reservations)) {
           setActivePin(trimmedPin);
           sessionStorage.setItem('bigbang_admin_pin', trimmedPin);
           sessionStorage.setItem('bb_admin_pin', trimmedPin);
           sessionStorage.setItem('bigbang_admin_auth', 'true');
-          onLoginSuccess(data.reservations || [], trimmedPin);
+          onLoginSuccess(data.reservations, trimmedPin);
           if (data.settings?.kakaoOpenChatUrl) {
             setOpenChatUrl(data.settings.kakaoOpenChatUrl);
           }
@@ -147,42 +135,9 @@ export const AdminReservationDrawer: React.FC<AdminReservationDrawerProps> = ({
         }
       }
 
-      // Fallback: If server returns non-200 or unexpected response, but PIN is valid (7525 / 2006)
-      if (isPinLocallyValid(trimmedPin)) {
-        setActivePin(trimmedPin);
-        sessionStorage.setItem('bigbang_admin_pin', trimmedPin);
-        sessionStorage.setItem('bb_admin_pin', trimmedPin);
-        sessionStorage.setItem('bigbang_admin_auth', 'true');
-        try {
-          const fetchRes = await fetch('/api/reservations', {
-            headers: { 'x-admin-pin': trimmedPin },
-          });
-          const fetchedData = await fetchRes.json();
-          if (fetchedData && Array.isArray(fetchedData.reservations)) {
-            onLoginSuccess(fetchedData.reservations, trimmedPin);
-            setPinInput('');
-            return;
-          }
-        } catch {
-          // ignore
-        }
-        onLoginSuccess([], trimmedPin);
-        setPinInput('');
-        return;
-      }
-
-      setErrorMessage('비밀번호가 올바르지 않습니다.');
-    } catch (err) {
-      if (isPinLocallyValid(trimmedPin)) {
-        setActivePin(trimmedPin);
-        sessionStorage.setItem('bigbang_admin_pin', trimmedPin);
-        sessionStorage.setItem('bb_admin_pin', trimmedPin);
-        sessionStorage.setItem('bigbang_admin_auth', 'true');
-        onLoginSuccess([], trimmedPin);
-        setPinInput('');
-      } else {
-        setErrorMessage('비밀번호가 올바르지 않습니다.');
-      }
+      setErrorMessage('관리자 인증에 실패했습니다. 비밀번호를 확인해 주세요.');
+    } catch {
+      setErrorMessage('관리자 서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.');
     } finally {
       setIsVerifying(false);
     }
@@ -194,7 +149,7 @@ export const AdminReservationDrawer: React.FC<AdminReservationDrawerProps> = ({
     setSettingsSaveMsg('');
 
     try {
-      const pinToUse = activePin || '7525';
+      const pinToUse = activePin;
       const res = await fetch('/api/admin/settings', {
         method: 'PATCH',
         headers: {
@@ -230,7 +185,7 @@ export const AdminReservationDrawer: React.FC<AdminReservationDrawerProps> = ({
     setIsSendingTest(true);
     setTestNotificationFeedback('');
     try {
-      const pinToUse = activePin || '7525';
+      const pinToUse = activePin;
       const res = await fetch('/api/admin/test-notify', {
         method: 'POST',
         headers: {
@@ -267,7 +222,7 @@ export const AdminReservationDrawer: React.FC<AdminReservationDrawerProps> = ({
     setTimeout(() => setCampaignSyncMsg(''), 4000);
 
     try {
-      const pinToUse = activePin || '7525';
+      const pinToUse = activePin;
       await fetch('/api/admin/settings', {
         method: 'PATCH',
         headers: {
