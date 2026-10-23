@@ -24,7 +24,7 @@ export const QuickReservationCard: React.FC<QuickReservationCardProps> = ({
   const [activeTab, setActiveTab] = useState<'form' | 'ai'>('form');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [school, setSchool] = useState(prefilledSchool || '동인천고');
+  const [school, setSchool] = useState(prefilledSchool || '');
   const [grade, setGrade] = useState(() => {
     if (prefilledGrade) return prefilledGrade;
     return showPrep2027 ? '2027 예비고1 (현 중3)' : '고1';
@@ -90,6 +90,11 @@ export const QuickReservationCard: React.FC<QuickReservationCardProps> = ({
     }
     if (!phone.trim() || phone.trim().length < 8) {
       setError('연락처(휴대폰 번호)를 올바르게 입력해 주세요.');
+      return;
+    }
+
+    if (!school) {
+      setError('재학 중인 학교를 선택해 주세요.');
       return;
     }
 
@@ -364,9 +369,11 @@ export const QuickReservationCard: React.FC<QuickReservationCardProps> = ({
                 <div className="relative">
                   <select
                     value={school}
+                    required
                     onChange={(e) => setSchool(e.target.value)}
                     className="w-full px-2.5 py-2.5 bg-slate-50 border border-slate-300 focus:border-[#122B49] focus:bg-white rounded-lg text-xs sm:text-sm transition focus:outline-hidden font-medium"
                   >
+                    <option value="" disabled>재학 중인 학교 선택</option>
                     <option value="동인천고">동인천고</option>
                     <option value="숭덕여고">숭덕여고</option>
                     <option value="문일여고">문일여고</option>
