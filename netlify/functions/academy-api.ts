@@ -22,7 +22,7 @@ const matchesEnvironment = (supplied: string) => {
 };
 const validAdmin = async (request: Request) => {
   const supplied = request.headers.get('x-admin-pin') || '';
-  if (supplied.length < 12 || supplied.length > 128) return false;
+  if (supplied.length < 8 || supplied.length > 128) return false;
   const record = await adminStore().get('credential', { type: 'json' }) as Credential | null;
   return record ? matchesCredential(supplied, record) : matchesEnvironment(supplied);
 };
@@ -55,9 +55,9 @@ export default async (request: Request) => {
       const newPassword = body?.newPassword;
       if (typeof currentPassword !== 'string' || typeof newPassword !== 'string') return json({ error: '현재 비밀번호와 새 비밀번호를 입력해 주세요.' }, 400);
       if (!(await validAdmin(new Request(request.url, { headers: { 'x-admin-pin': currentPassword } })))) return json({ error: '현재 비밀번호가 올바르지 않습니다.' }, 401);
-      if (newPassword.length < 12 || newPassword.length > 128 || newPassword !== newPassword.trim() || newPassword === currentPassword ||
-          !/[A-Za-z]/.test(newPassword) || !/[0-9]/.test(newPassword) || !/[^A-Za-z0-9]/.test(newPassword)) {
-        return json({ error: '새 비밀번호는 12~128자이며 영문·숫자·특수문자를 포함해야 합니다. 기존 비밀번호와 달라야 합니다.' }, 400);
+      const categoryCount = Number(/[A-Za-z]/.test(newPassword)) + Number(/[0-9]/.test(newPassword)) + Number(/[\p{P}\p{S}]/u.test(newPassword));
+      if (newPassword.length < 8 || newPassword.length > 128 || newPassword !== newPassword.trim() || newPassword === currentPassword || categoryCount < 2) {
+        return json({ error: '새 비밀번호는 8~128자이며 영문·숫자·특수문자 중 2종류 이상을 포함해야 합니다. 기존 비밀번호와 달라야 합니다.' }, 400);
       }
       const credentials = adminStore();
       const previous = await credentials.getWithMetadata('credential', { type: 'json' }) as { data: Credential; etag: string } | null;
