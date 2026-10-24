@@ -17,6 +17,12 @@
   force = true
 
 [[redirects]]
+  from = "/api/admin/change-password"
+  to = "/.netlify/functions/academy-api?route=change-password"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/api/admin/verify"
   to = "/.netlify/functions/academy-api?route=verify"
   status = 200
