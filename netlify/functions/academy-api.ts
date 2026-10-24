@@ -1,15 +1,30 @@
 import { getDeployStore, getStore } from '@netlify/blobs';
-import { timingSafeEqual } from 'node:crypto';
+import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
 const store = () => process.env.CONTEXT === 'production'
   ? getStore({ name: 'academy-reservations', consistency: 'strong' })
   : getDeployStore({ name: 'academy-reservations', consistency: 'strong' });
-const validAdmin = (request: Request) => {
+const adminStore = () => process.env.CONTEXT === 'production'
+  ? getStore({ name: 'academy-admin', consistency: 'strong' })
+  : getDeployStore({ name: 'academy-admin', consistency: 'strong' });
+type Credential = { salt: string; hash: string; updatedAt: string };
+const matchesCredential = (supplied: string, record: Credential) => {
+  if (!/^[a-f0-9]{32}$/.test(record.salt) || !/^[a-f0-9]{128}$/.test(record.hash)) return false;
+  const computed = scryptSync(supplied, Buffer.from(record.salt, 'hex'), 64);
+  return timingSafeEqual(computed, Buffer.from(record.hash, 'hex'));
+};
+const matchesEnvironment = (supplied: string) => {
   const expected = process.env.ADMIN_PIN || '';
+  const provided = Buffer.from(supplied);
+  const original = Buffer.from(expected);
+  return expected.length >= 16 && provided.length === original.length && timingSafeEqual(provided, original);
+};
+const validAdmin = async (request: Request) => {
   const supplied = request.headers.get('x-admin-pin') || '';
-  if (expected.length < 16 || supplied.length !== expected.length) return false;
-  return timingSafeEqual(Buffer.from(supplied), Buffer.from(expected));
+  if (supplied.length < 12 || supplied.length > 128) return false;
+  const record = await adminStore().get('credential', { type: 'json' }) as Credential | null;
+  return record ? matchesCredential(supplied, record) : matchesEnvironment(supplied);
 };
 const clean = (value: unknown, max: number) => typeof value === 'string' ? value.trim().slice(0, max) : '';
 const sameOrigin = (request: Request) => {
@@ -22,19 +37,45 @@ export default async (request: Request) => {
     const url = new URL(request.url);
     const parts = url.pathname.split('/').filter(Boolean);
     const publicPath = parts[0] === 'api' ? parts.slice(1).join('/') : '';
-    const route = url.searchParams.get('route') || (publicPath === 'reservations' ? 'reservations' : publicPath === 'admin/verify' ? 'verify' : publicPath === 'admin/settings' ? 'admin-settings' : publicPath === 'admin/test-notify' ? 'test-notify' : publicPath === 'settings' ? 'settings' : /^reservations\/[^/]+\/status$/.test(publicPath) ? 'status' : /^reservations\/[^/]+\/test$/.test(publicPath) ? 'delete-test' : '');
+    const route = url.searchParams.get('route') || (publicPath === 'reservations' ? 'reservations' : publicPath === 'admin/verify' ? 'verify' : publicPath === 'admin/change-password' ? 'change-password' : publicPath === 'admin/settings' ? 'admin-settings' : publicPath === 'admin/test-notify' ? 'test-notify' : publicPath === 'settings' ? 'settings' : /^reservations\/[^/]+\/status$/.test(publicPath) ? 'status' : /^reservations\/[^/]+\/test$/.test(publicPath) ? 'delete-test' : '');
     if (!route) return json({ error: 'Not found' }, 404);
     if (!sameOrigin(request)) return json({ error: '허용되지 않은 요청입니다.' }, 403);
     if (route === 'settings' && request.method === 'GET') return json({});
     if (route === 'admin-settings' || route === 'test-notify') {
-      if (!validAdmin(request)) return json({ error: '관리자 인증이 필요합니다.' }, 401);
+      if (!(await validAdmin(request))) return json({ error: '관리자 인증이 필요합니다.' }, 401);
       if (route === 'admin-settings' && request.method === 'GET') return json({ smsEnabled: false, notificationStatus: '미설정' });
       return json({ error: '자동 알림은 연결되지 않았습니다.' }, 501);
+    }
+    if (route === 'change-password' && request.method === 'POST') {
+      if (!request.headers.get('content-type')?.includes('application/json')) return json({ error: '잘못된 요청입니다.' }, 415);
+      const raw = await request.text();
+      if (raw.length > 2048) return json({ error: '입력 내용이 너무 깁니다.' }, 413);
+      const body = JSON.parse(raw);
+      const currentPassword = body?.currentPassword;
+      const newPassword = body?.newPassword;
+      if (typeof currentPassword !== 'string' || typeof newPassword !== 'string') return json({ error: '현재 비밀번호와 새 비밀번호를 입력해 주세요.' }, 400);
+      if (!(await validAdmin(new Request(request.url, { headers: { 'x-admin-pin': currentPassword } })))) return json({ error: '현재 비밀번호가 올바르지 않습니다.' }, 401);
+      if (newPassword.length < 12 || newPassword.length > 128 || newPassword !== newPassword.trim() || newPassword === currentPassword ||
+          !/[A-Za-z]/.test(newPassword) || !/[0-9]/.test(newPassword) || !/[^A-Za-z0-9]/.test(newPassword)) {
+        return json({ error: '새 비밀번호는 12~128자이며 영문·숫자·특수문자를 포함해야 합니다. 기존 비밀번호와 달라야 합니다.' }, 400);
+      }
+      const credentials = adminStore();
+      const previous = await credentials.getWithMetadata('credential', { type: 'json' }) as { data: Credential; etag: string } | null;
+      if (previous ? !matchesCredential(currentPassword, previous.data) : !matchesEnvironment(currentPassword)) {
+        return json({ error: '비밀번호가 이미 변경되었습니다. 새로고침 후 다시 시도해 주세요.' }, 409);
+      }
+      const salt = randomBytes(16).toString('hex');
+      const record: Credential = { salt, hash: scryptSync(newPassword, Buffer.from(salt, 'hex'), 64).toString('hex'), updatedAt: new Date().toISOString() };
+      const { modified } = await credentials.setJSON('credential', record, previous ? { onlyIfMatch: previous.etag } : { onlyIfNew: true });
+      if (!modified) return json({ error: '다른 변경이 먼저 저장되었습니다. 다시 시도해 주세요.' }, 409);
+      const saved = await credentials.get('credential', { type: 'json' }) as Credential | null;
+      if (!saved || !matchesCredential(newPassword, saved)) return json({ error: '변경 저장을 확인하지 못했습니다. 관리자에게 문의해 주세요.' }, 503);
+      return json({ success: true });
     }
     if (route === 'verify' && request.method === 'POST') {
       const body = await request.json();
       const pin = clean(body?.pin, 256);
-      const authorized = validAdmin(new Request(request.url, { headers: { 'x-admin-pin': pin } }));
+      const authorized = await validAdmin(new Request(request.url, { headers: { 'x-admin-pin': pin } }));
       if (!authorized) return json({ error: '관리자 비밀번호가 올바르지 않습니다.' }, 401);
       const reservations = await allReservations();
       return json({ success: true, reservations, count: reservations.length, settings: { smsEnabled: false } });
@@ -42,7 +83,7 @@ export default async (request: Request) => {
     if (route === 'reservations' && request.method === 'GET') {
       const records = store();
       const entries = await records.list();
-      if (!validAdmin(request)) return json({ count: entries.blobs.length, available: true });
+      if (!(await validAdmin(request))) return json({ count: entries.blobs.length, available: true });
       const reservations = await Promise.all(entries.blobs.map(({ key }) => records.get(key, { type: 'json' })));
       const sorted = reservations.filter(Boolean).sort((a: any, b: any) => b.createdAt.localeCompare(a.createdAt));
       return json({ count: sorted.length, reservations: sorted, authorized: true, available: true });
@@ -74,7 +115,7 @@ export default async (request: Request) => {
       return json({ reservation: persisted, notificationStatus: 'not_sent' }, 201);
     }
     if (route === 'status' && request.method === 'PATCH') {
-      if (!validAdmin(request)) return json({ error: '관리자 인증이 필요합니다.' }, 401);
+      if (!(await validAdmin(request))) return json({ error: '관리자 인증이 필요합니다.' }, 401);
       const id = url.searchParams.get('id') || parts[2] || '';
       if (!/^[0-9a-f-]{36}$/.test(id)) return json({ error: '잘못된 접수번호입니다.' }, 400);
       const body = await request.json();
@@ -88,7 +129,7 @@ export default async (request: Request) => {
       return json({ reservation: updated });
     }
     if (route === 'delete-test' && request.method === 'DELETE') {
-      if (!validAdmin(request)) return json({ error: '관리자 인증이 필요합니다.' }, 401);
+      if (!(await validAdmin(request))) return json({ error: '관리자 인증이 필요합니다.' }, 401);
       const id = url.searchParams.get('id') || parts[2] || '';
       if (!/^[0-9a-f-]{36}$/.test(id)) return json({ error: '잘못된 접수번호입니다.' }, 400);
       const records = store();

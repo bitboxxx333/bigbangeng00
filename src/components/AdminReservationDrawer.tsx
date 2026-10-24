@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Reservation } from '../types';
 import { ACADEMY_INFO } from '../data/schools';
+import { AdminPasswordChangeForm } from './AdminPasswordChangeForm';
 import { 
   X, 
   Calendar, 
@@ -63,6 +64,7 @@ export const AdminReservationDrawer: React.FC<AdminReservationDrawerProps> = ({
   const [showPin, setShowPin] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [showChangePassword, setShowChangePassword] = useState(false);
 
   // Notification Settings State
   const [openChatUrl, setOpenChatUrl] = useState(ACADEMY_INFO.kakaoChannelUrl);
@@ -105,7 +107,7 @@ export const AdminReservationDrawer: React.FC<AdminReservationDrawerProps> = ({
     e.preventDefault();
     const trimmedPin = pinInput.trim();
     if (!trimmedPin) {
-      setErrorMessage('관리자 PIN 번호를 입력해 주세요.');
+      setErrorMessage('관리자 비밀번호를 입력해 주세요.');
       return;
     }
 
@@ -376,16 +378,17 @@ export const AdminReservationDrawer: React.FC<AdminReservationDrawerProps> = ({
                 </div>
               </div>
 
-              {/* PIN Entry Form */}
+              {/* Login or password change */}
+              {showChangePassword ? <div className="bg-white rounded-2xl border-2 border-[#122B49]"><AdminPasswordChangeForm onBack={() => setShowChangePassword(false)} /></div> : (
               <form onSubmit={handleVerifyPin} className="bg-white p-6 rounded-2xl border-2 border-[#122B49] shadow-sm space-y-4">
                 <div className="flex items-center gap-2 text-xs font-bold text-[#122B49]">
                   <KeyRound className="w-4 h-4 text-[#C59750]" />
-                  <span>원장 & 관리자 PIN 인증</span>
+                  <span>원장 & 관리자 인증</span>
                 </div>
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700 block">
-                    관리자 비밀번호 (PIN)
+                    관리자 비밀번호
                   </label>
                   <div className="relative">
                     <input
@@ -397,7 +400,8 @@ export const AdminReservationDrawer: React.FC<AdminReservationDrawerProps> = ({
                       }}
                       placeholder="비밀번호를 입력하세요"
                       className="w-full px-3.5 py-3 border border-slate-300 rounded-xl text-sm font-semibold focus:outline-none focus:border-[#122B49] pr-10 bg-slate-50/50"
-                      maxLength={20}
+                      maxLength={128}
+                      autoComplete="current-password"
                       autoFocus
                     />
                     <button
@@ -435,6 +439,8 @@ export const AdminReservationDrawer: React.FC<AdminReservationDrawerProps> = ({
                   )}
                 </button>
               </form>
+              )}
+              {!showChangePassword && <button type="button" onClick={() => { setShowChangePassword(true); setErrorMessage(''); }} className="block mx-auto text-xs font-bold text-[#122B49] underline">관리자 비밀번호 변경</button>}
             </div>
 
             <div className="text-center text-[11px] text-slate-400 py-2">
