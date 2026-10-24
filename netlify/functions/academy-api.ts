@@ -18,7 +18,8 @@ const matchesEnvironment = (supplied: string) => {
   const expected = process.env.ADMIN_PIN || '';
   const provided = Buffer.from(supplied);
   const original = Buffer.from(expected);
-  return expected.length >= 16 && provided.length === original.length && timingSafeEqual(provided, original);
+  const categoryCount = Number(/[A-Za-z]/.test(expected)) + Number(/[0-9]/.test(expected)) + Number(/[\p{P}\p{S}]/u.test(expected));
+  return expected.length >= 8 && expected.length <= 128 && categoryCount >= 2 && provided.length === original.length && timingSafeEqual(provided, original);
 };
 const validAdmin = async (request: Request) => {
   const supplied = request.headers.get('x-admin-pin') || '';
