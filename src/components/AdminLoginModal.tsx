@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Lock, KeyRound, ShieldCheck, AlertCircle, Eye, EyeOff, X, ArrowRight } from 'lucide-react';
 import { Reservation } from '../types';
+import { AdminPasswordChangeForm } from './AdminPasswordChangeForm';
 
 interface AdminLoginModalProps {
   isOpen: boolean;
@@ -17,6 +18,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
   const [showPin, setShowPin] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [showChangePassword, setShowChangePassword] = useState(false);
 
   if (!isOpen) return null;
 
@@ -82,6 +84,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
         </div>
 
         {/* Body */}
+        {showChangePassword ? <AdminPasswordChangeForm onBack={() => setShowChangePassword(false)} /> : (
         <form onSubmit={handleLogin} className="p-6 space-y-4">
           <div className="text-center space-y-1">
             <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 text-amber-700 flex items-center justify-center mx-auto mb-2">
@@ -107,7 +110,8 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
                 }}
                 placeholder="비밀번호를 입력하세요"
                 className="w-full px-3.5 py-3 border border-slate-300 rounded-xl text-sm font-semibold focus:outline-hidden focus:ring-2 focus:ring-[#122B49] focus:border-[#122B49] pr-10 bg-slate-50/50"
-                maxLength={20}
+                maxLength={128}
+                autoComplete="current-password"
                 autoFocus
               />
               <button
@@ -147,6 +151,8 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
               )}
             </button>
 
+            <button type="button" onClick={() => { setShowChangePassword(true); setErrorMessage(''); }} className="w-full py-2.5 text-[#122B49] font-bold text-xs underline">관리자 비밀번호 변경</button>
+
             <button
               type="button"
               onClick={onClose}
@@ -156,6 +162,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
             </button>
           </div>
         </form>
+        )}
       </div>
     </div>
   );
